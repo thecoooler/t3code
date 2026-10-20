@@ -37,6 +37,10 @@ import {
   resolveSidebarRowAccessibility,
   resolveSidebarThreadStatus,
   resolveSidebarV2TopStatus,
+  summarizeSidebarProjectIndicators,
+  resolveScopedNewThreadProjectRef,
+  resolveProjectActivationThreadKey,
+  isSidebarThreadDone,
   resolveThreadLastVisitedAt,
   resolveThreadStatusPill,
   resolveWorkingStartedAt,
@@ -540,6 +544,41 @@ function makeLatestRun(overrides?: {
   };
 }
 
+describe("persistent Done status", () => {
+  it("keeps Done after viewing a completed thread", () => {
+    const completed = {
+      ...makeThreadFixture(),
+      latestRun: makeLatestRun(),
+      settledOverride: null,
+    };
+    for (const lastVisitedAt of ["2026-03-09T10:04:00.000Z", "2026-03-09T10:06:00.000Z"]) {
+      const thread = { ...completed, lastVisitedAt };
+      expect(isSidebarThreadDone(thread)).toBe(true);
+      expect(
+        resolveSidebarV2TopStatus({
+          status: resolveSidebarThreadStatus(thread),
+          isDone: isSidebarThreadDone(thread),
+          isWoke: false,
+        }),
+      ).toBe("done");
+    }
+    expect(hasUnseenCompletion({ ...completed, lastVisitedAt: "2026-03-09T10:06:00.000Z" })).toBe(
+      false,
+    );
+  });
+
+  it("clears Done when the chat is closed or another run replaces the completion", () => {
+    expect(isSidebarThreadDone({ latestRun: makeLatestRun(), settledOverride: "settled" })).toBe(
+      false,
+    );
+    for (const status of ["running", "failed", "interrupted"] as const) {
+      const thread = { latestRun: { ...makeLatestRun(), status }, settledOverride: null };
+      expect(isSidebarThreadDone(thread)).toBe(false);
+    }
+    expect(isSidebarThreadDone({ latestRun: null, settledOverride: null })).toBe(false);
+  });
+});
+
 describe("hasUnseenCompletion", () => {
   it("returns true when a thread completed after its last visit", () => {
     expect(
@@ -990,7 +1029,7 @@ describe("resolveSidebarThreadStatus", () => {
     expect(
       resolveSidebarThreadStatus({ ...idle, runtime: { ...limited, status: "completed" } }),
     ).toBe("ready");
-    expect(resolveSidebarV2TopStatus({ status: "limited", isUnread: false, isWoke: false })).toBe(
+    expect(resolveSidebarV2TopStatus({ status: "limited", isDone: false, isWoke: false })).toBe(
       "limited",
     );
     expect(
@@ -1030,7 +1069,7 @@ describe("resolveSidebarThreadStatus", () => {
   });
 
   it("keeps a waiting runtime visible ahead of unread and woke presentation", () => {
-    expect(resolveSidebarV2TopStatus({ status: "waiting", isUnread: true, isWoke: true })).toBe(
+    expect(resolveSidebarV2TopStatus({ status: "waiting", isDone: true, isWoke: true })).toBe(
       "waiting",
     );
   });
@@ -1975,6 +2014,40 @@ describe("sortLogicalProjectsForSidebar", () => {
 });
 
 describe("sortSidebarV2ProjectGroups", () => {
+  it.each(["manual", "updated_at", "created_at"] as const)(
+    "keeps No project first while preserving %s order for other projects",
+    (sortOrder) => {
+      const projects = [
+        {
+          ...makeProject({ title: "B" }),
+          projectKey: "b",
+          memberProjectRefs: [],
+          isScratch: false,
+        },
+        {
+          ...makeProject({ title: "No project" }),
+          projectKey: "scratch",
+          memberProjectRefs: [],
+          isScratch: true,
+        },
+        {
+          ...makeProject({ title: "A" }),
+          projectKey: "a",
+          memberProjectRefs: [],
+          isScratch: false,
+        },
+      ];
+      const ordinary = sortLogicalProjectsForSidebar(
+        projects.filter((project) => !project.isScratch),
+        [],
+        sortOrder,
+      );
+      expect(
+        sortSidebarV2ProjectGroups(projects, [], sortOrder).map((project) => project.projectKey),
+      ).toEqual(["scratch", ...ordinary.map((project) => project.projectKey)]);
+    },
+  );
+
   it("does not let a hidden subagent thread reorder projects", () => {
     const olderProjectId = ProjectId.make("project-older");
     const newerProjectId = ProjectId.make("project-newer");
@@ -2201,7 +2274,9 @@ describe("unseen completion with background work", () => {
 
     expect(isUnread).toBe(true);
     expect(status).toBe(expected.status);
-    expect(resolveSidebarV2TopStatus({ status, isUnread, isWoke: false })).toBe(expected.topStatus);
+    expect(
+      resolveSidebarV2TopStatus({ status, isDone: isSidebarThreadDone(thread), isWoke: false }),
+    ).toBe(expected.topStatus);
     expect(
       shouldRecedeSidebarThread({
         status,
@@ -2447,5 +2522,225 @@ describe("Working shelf (beta)", () => {
         unsnooze: false,
       });
     });
+  });
+});
+
+describe("summarizeSidebarProjectIndicators", () => {
+  const running = {
+    status: "running" as const,
+    activeRunId: null,
+    providerInstanceId: ProviderInstanceId.make("codex"),
+    providerName: "Codex",
+    lastError: null,
+    updatedAt: "2026-03-09T10:00:00.000Z",
+  };
+  const makeIndicatorThread = (
+    id: string,
+    projectId: string,
+    overrides: Partial<Parameters<typeof summarizeSidebarProjectIndicators>[0]["threads"][number]>,
+  ) => ({
+    id: ThreadId.make(id),
+    environmentId: localEnvironmentId,
+    projectId: ProjectId.make(projectId),
+    archivedAt: null,
+    lineage: { rootThreadId: ThreadId.make(id), parentThreadId: null, relationshipToParent: null },
+    hasActionableProposedPlan: false,
+    hasPendingApprovals: false,
+    hasPendingUserInput: false,
+    pendingSubagentRequest: null,
+    interactionMode: "default" as const,
+    latestRun: null,
+    runtime: null,
+    settledOverride: null,
+    lastVisitedAt: "2026-03-09T10:10:00.000Z",
+    ...overrides,
+  });
+  const projectKeyByMemberKey = new Map([
+    [`${localEnvironmentId}:project-a`, "group-a"],
+    [`${localEnvironmentId}:project-b`, "group-b"],
+  ]);
+
+  it("flags working, blocked and done threads and counts unsettled ones", () => {
+    const result = summarizeSidebarProjectIndicators({
+      threads: [
+        makeIndicatorThread("working", "project-a", { runtime: running }),
+        makeIndicatorThread("approval", "project-a", { hasPendingApprovals: true }),
+        makeIndicatorThread("done", "project-b", {
+          latestRun: makeLatestRun(),
+          lastVisitedAt: "2026-03-09T10:04:00.000Z",
+        }),
+        makeIndicatorThread("seen", "project-b", { latestRun: makeLatestRun() }),
+        makeIndicatorThread("settled", "project-b", {
+          latestRun: makeLatestRun(),
+          settledOverride: "settled",
+        }),
+      ],
+      projectKeyByMemberKey,
+    });
+
+    expect(result.byProjectKey.get("group-a")).toEqual({
+      working: true,
+      blocked: true,
+      done: false,
+      openThreadCount: 2,
+    });
+    expect(result.byProjectKey.get("group-b")).toEqual({
+      working: false,
+      blocked: false,
+      done: true,
+      openThreadCount: 2,
+    });
+    expect(result.all).toEqual({ working: true, blocked: true, done: true, openThreadCount: 4 });
+  });
+
+  it("keeps the project Done indicator after a visit and clears it on close", () => {
+    const thread = makeIndicatorThread("seen", "project-b", { latestRun: makeLatestRun() });
+    const summarize = (settledOverride: typeof thread.settledOverride) =>
+      summarizeSidebarProjectIndicators({
+        threads: [{ ...thread, settledOverride }],
+        projectKeyByMemberKey,
+      });
+    expect(summarize(null).byProjectKey.get("group-b")?.done).toBe(true);
+    expect(summarize("settled").byProjectKey.get("group-b")?.done).toBe(false);
+  });
+
+  it("ignores archived threads and projects outside the groups", () => {
+    const result = summarizeSidebarProjectIndicators({
+      threads: [
+        makeIndicatorThread("archived", "project-a", {
+          runtime: running,
+          archivedAt: "2026-03-09T10:00:00.000Z",
+        }),
+        makeIndicatorThread("orphan", "project-z", { hasPendingUserInput: true }),
+      ],
+      projectKeyByMemberKey,
+    });
+
+    expect(result.byProjectKey.size).toBe(0);
+    expect(result.all).toEqual({
+      working: false,
+      blocked: false,
+      done: false,
+      openThreadCount: 0,
+    });
+  });
+});
+
+describe("resolveScopedNewThreadProjectRef", () => {
+  const remoteEnvironmentId = EnvironmentId.make("environment-remote");
+  const localRef = { environmentId: localEnvironmentId, projectId: ProjectId.make("project-1") };
+  const remoteRef = { environmentId: remoteEnvironmentId, projectId: ProjectId.make("project-9") };
+
+  it("stays on the machine of the open thread when it hosts the scoped project", () => {
+    expect(
+      resolveScopedNewThreadProjectRef({
+        memberProjectRefs: [localRef, remoteRef],
+        contextProjectRef: remoteRef,
+        primaryEnvironmentId: localEnvironmentId,
+      }),
+    ).toEqual(remoteRef);
+  });
+
+  it("falls back to the primary environment when the open thread is elsewhere", () => {
+    expect(
+      resolveScopedNewThreadProjectRef({
+        memberProjectRefs: [remoteRef, localRef],
+        contextProjectRef: {
+          environmentId: localEnvironmentId,
+          projectId: ProjectId.make("other"),
+        },
+        primaryEnvironmentId: localEnvironmentId,
+      }),
+    ).toEqual(localRef);
+  });
+
+  it("uses the first member when no member is on the primary environment", () => {
+    expect(
+      resolveScopedNewThreadProjectRef({
+        memberProjectRefs: [remoteRef],
+        contextProjectRef: null,
+        primaryEnvironmentId: localEnvironmentId,
+      }),
+    ).toEqual(remoteRef);
+  });
+});
+
+describe("resolveProjectActivationThreadKey", () => {
+  it("reopens the remembered thread while the project still lists it", () => {
+    expect(
+      resolveProjectActivationThreadKey({
+        rememberedThreadKey: "env:thread-b",
+        nonSettledThreadKeys: new Set(["env:thread-a", "env:thread-b"]),
+        orderedThreadKeys: ["env:thread-a", "env:thread-b"],
+      }),
+    ).toBe("env:thread-b");
+  });
+
+  it("falls back to the first row when nothing is remembered or it is gone", () => {
+    const nonSettledThreadKeys = new Set(["env:thread-a"]);
+    expect(
+      resolveProjectActivationThreadKey({
+        rememberedThreadKey: undefined,
+        nonSettledThreadKeys,
+        orderedThreadKeys: ["env:thread-a"],
+      }),
+    ).toBe("env:thread-a");
+    expect(
+      resolveProjectActivationThreadKey({
+        rememberedThreadKey: "env:archived",
+        nonSettledThreadKeys,
+        orderedThreadKeys: ["env:thread-a"],
+      }),
+    ).toBe("env:thread-a");
+  });
+
+  it("opens the first project thread when all shelves are collapsed", () => {
+    expect(
+      resolveProjectActivationThreadKey({
+        rememberedThreadKey: undefined,
+        nonSettledThreadKeys: new Set(["env:thread-a", "env:thread-b"]),
+        orderedThreadKeys: [],
+      }),
+    ).toBe("env:thread-a");
+  });
+
+  it("reopens a remembered thread in a collapsed shelf", () => {
+    expect(
+      resolveProjectActivationThreadKey({
+        rememberedThreadKey: "env:thread-b",
+        nonSettledThreadKeys: new Set(["env:thread-a", "env:thread-b"]),
+        orderedThreadKeys: ["env:thread-a"],
+      }),
+    ).toBe("env:thread-b");
+  });
+
+  it("skips a remembered settled thread and settled rows before the first open thread", () => {
+    expect(
+      resolveProjectActivationThreadKey({
+        rememberedThreadKey: "env:settled",
+        nonSettledThreadKeys: new Set(["env:open"]),
+        orderedThreadKeys: ["env:settled", "env:open"],
+      }),
+    ).toBe("env:open");
+  });
+
+  it("requests a new draft when all project threads are settled", () => {
+    expect(
+      resolveProjectActivationThreadKey({
+        rememberedThreadKey: "env:settled",
+        nonSettledThreadKeys: new Set(),
+        orderedThreadKeys: ["env:settled"],
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null for a project without threads", () => {
+    expect(
+      resolveProjectActivationThreadKey({
+        rememberedThreadKey: "env:archived",
+        nonSettledThreadKeys: new Set(),
+        orderedThreadKeys: [],
+      }),
+    ).toBeNull();
   });
 });

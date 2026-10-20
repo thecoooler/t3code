@@ -1,6 +1,9 @@
 export const THREAD_SIDEBAR_WIDTH_STORAGE_KEY = "chat_thread_sidebar_width";
-const THREAD_SIDEBAR_DEFAULT_WIDTH = 16 * 16;
-export const THREAD_SIDEBAR_MIN_WIDTH = 13 * 16;
+// The project rail (`w-44` in SidebarProjectRail) shares the sidebar's width,
+// so the thread list keeps its own room on top of it.
+const PROJECT_RAIL_WIDTH = 11 * 16;
+const THREAD_SIDEBAR_DEFAULT_WIDTH = 16 * 16 + PROJECT_RAIL_WIDTH;
+export const THREAD_SIDEBAR_MIN_WIDTH = 13 * 16 + PROJECT_RAIL_WIDTH;
 export const THREAD_MAIN_CONTENT_MIN_WIDTH = 40 * 16;
 
 export function resolveThreadSidebarMinimumWidth(brandWidth: number): number {

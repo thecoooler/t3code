@@ -13,7 +13,9 @@ describe("resolveThreadSidebarMinimumWidth", () => {
   });
 
   it("grows to a brand wider than the default, rounding up", () => {
-    expect(resolveThreadSidebarMinimumWidth(237.2)).toBe(238);
+    expect(resolveThreadSidebarMinimumWidth(THREAD_SIDEBAR_MIN_WIDTH + 29.2)).toBe(
+      THREAD_SIDEBAR_MIN_WIDTH + 30,
+    );
   });
 });
 
