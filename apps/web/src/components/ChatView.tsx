@@ -8370,7 +8370,7 @@ export default function ChatView(props: ChatViewProps) {
               <div ref={draftHeroTransitionGroupRef} className="chat-composer-lane w-full">
                 <div
                   data-chat-composer-stack="true"
-                  className="group/composer-stack pointer-events-auto relative z-10 mx-auto w-full max-w-(--chat-content-max-width)"
+                  className="chat-content-lane group/composer-stack pointer-events-auto relative z-10"
                 >
                   {isDraftHeroState ? (
                     <div className="absolute inset-x-0 bottom-full">

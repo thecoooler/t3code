@@ -429,19 +429,26 @@ export function resolveTimelineMinimapCurrentIndex(input: {
   return precedingIndex;
 }
 
-function resolveTimelineSideGutter(viewportWidth: number, contentWidth: number): number {
+function resolveTimelineSideGutter(
+  viewportWidth: number,
+  contentWidth: number,
+  contentInsetStart: number = (viewportWidth - contentWidth) / 2,
+): number {
   if (!Number.isFinite(viewportWidth) || viewportWidth <= 0 || !Number.isFinite(contentWidth)) {
     return 0;
   }
-  return Math.max(0, (viewportWidth - Math.min(viewportWidth, contentWidth)) / 2);
+  if (!Number.isFinite(contentInsetStart)) return 0;
+  return Math.max(0, Math.min(contentInsetStart, viewportWidth - contentWidth));
 }
 
 export function resolveTimelineMinimapHasPersistentGutter(
   viewportWidth: number,
   contentWidth: number,
+  contentInsetStart?: number,
 ): boolean {
   return (
-    resolveTimelineSideGutter(viewportWidth, contentWidth) >= TIMELINE_MINIMAP_PERSISTENT_GUTTER
+    resolveTimelineSideGutter(viewportWidth, contentWidth, contentInsetStart) >=
+    TIMELINE_MINIMAP_PERSISTENT_GUTTER
   );
 }
 
@@ -452,8 +459,9 @@ const TIMELINE_MINIMAP_EXPANDED_HIT_STRIP_WIDTH = "22rem";
 export function resolveTimelineMinimapHitStripWidth(
   viewportWidth: number,
   contentWidth: number,
+  contentInsetStart?: number,
 ): number {
-  const sideGutter = resolveTimelineSideGutter(viewportWidth, contentWidth);
+  const sideGutter = resolveTimelineSideGutter(viewportWidth, contentWidth, contentInsetStart);
   return Math.max(
     0,
     Math.min(

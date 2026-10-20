@@ -1255,19 +1255,26 @@ const ConversationTimeline = memo(function ConversationTimeline({
     }
 
     const measure = () => {
-      const viewportWidth = timelineViewportElement.getBoundingClientRect().width;
-      const contentWidth =
-        timelineViewportElement
-          .querySelector<HTMLElement>("[data-timeline-root]")
-          ?.getBoundingClientRect().width ?? viewportWidth;
+      const viewportBounds = timelineViewportElement.getBoundingClientRect();
+      const viewportWidth = viewportBounds.width;
+      const contentBounds = timelineViewportElement
+        .querySelector<HTMLElement>("[data-timeline-root]")
+        ?.getBoundingClientRect();
+      const contentWidth = contentBounds?.width ?? viewportWidth;
+      // The minimap lives on the left; unused space on the right is not its gutter.
+      const contentInsetStart =
+        contentBounds === undefined ? 0 : contentBounds.left - viewportBounds.left;
       const nextHasPersistentGutter = resolveTimelineMinimapHasPersistentGutter(
         viewportWidth,
         contentWidth,
+        contentInsetStart,
       );
       setMinimapHasPersistentGutter((current) =>
         current === nextHasPersistentGutter ? current : nextHasPersistentGutter,
       );
-      setMinimapHitStripWidth(resolveTimelineMinimapHitStripWidth(viewportWidth, contentWidth));
+      setMinimapHitStripWidth(
+        resolveTimelineMinimapHitStripWidth(viewportWidth, contentWidth, contentInsetStart),
+      );
       reportContentOverflow();
     };
 

@@ -5728,6 +5728,13 @@ describe("timeline end and minimap geometry", () => {
     expect(resolveTimelineIsAtEnd({ isAtEnd: false })).toBe(false);
   });
 
+  it("uses the measured left gutter for a left-aligned chat", () => {
+    expect(resolveTimelineMinimapHasPersistentGutter(1600, 768, 0)).toBe(false);
+    expect(resolveTimelineMinimapHitStripWidth(1600, 768, 0)).toBe(0);
+    expect(resolveTimelineMinimapHasPersistentGutter(1600, 768, 48)).toBe(true);
+    expect(resolveTimelineMinimapHitStripWidth(1600, 768, 48)).toBe(36);
+  });
+
   it("maps the minimap rail to rows and sizes its hit strip from the free gutter", () => {
     expect(resolveTimelineMinimapHeightStyle(5)).toBe("min(32px, calc(100vh - 18rem))");
     expect(resolveTimelineMinimapTopPercent(2, 5)).toBe(50);
