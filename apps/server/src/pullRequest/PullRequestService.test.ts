@@ -576,6 +576,87 @@ function makeService(input: {
   );
 }
 
+it.effect("lists only fork origins before provider reads and deduplicates checkouts by fork", () =>
+  Effect.gen(function* () {
+    const reads: string[] = [];
+    const fork = (id: string, owner: string) => {
+      const upstream = project({
+        id,
+        title: id,
+        workspaceRoot: `/${id}`,
+        repository: "upstream/web",
+      });
+      return {
+        ...upstream,
+        repositoryIdentity: {
+          ...upstream.repositoryIdentity!,
+          origin: { canonicalKey: `github.com/${owner}/web`, displayName: `${owner}/web` },
+        },
+      };
+    };
+    const service = yield* makeService({
+      projects: [fork("fork-a", "alice"), fork("worktree-a", "alice"), fork("fork-b", "bob")],
+      providers: [
+        fakeProvider(SourceControlProviderKind.make("github"), {
+          listChangeRequests: (input) =>
+            Effect.sync(() => {
+              reads.push(`${input.host}/${input.repository}`);
+              return { items: [changeRequest(1, "2026-07-02T00:00:00Z")], truncated: false };
+            }),
+        }),
+      ],
+    });
+    const result = yield* service.list({ state: "open" });
+    assert.deepStrictEqual(reads.toSorted(), ["github.com/alice/web", "github.com/bob/web"]);
+    assert.deepStrictEqual(result.entries.map((entry) => entry.repository).toSorted(), [
+      "alice/web",
+      "bob/web",
+    ]);
+  }),
+);
+
+it.effect("scopes batched listing to origin on its host rather than the upstream host", () =>
+  Effect.gen(function* () {
+    const reads: { host: string | undefined; repositories: readonly string[] }[] = [];
+    const upstream = project({
+      id: "fork",
+      title: "fork",
+      workspaceRoot: "/fork",
+      repository: "upstream/web",
+    });
+    const service = yield* makeService({
+      projects: [
+        {
+          ...upstream,
+          repositoryIdentity: {
+            ...upstream.repositoryIdentity!,
+            origin: { canonicalKey: "code.example.test/me/web" },
+          },
+        },
+      ],
+      providers: [
+        fakeProvider(SourceControlProviderKind.make("github"), {
+          listChangeRequestsAcross: (input) =>
+            Effect.sync(() => {
+              reads.push({ host: input.host, repositories: input.repositories });
+              return { items: [], truncated: false };
+            }),
+        }),
+      ],
+      resolveHandle: ({ context }) =>
+        Effect.succeed({
+          context: {
+            ...context!,
+            provider: { ...context!.provider, kind: SourceControlProviderKind.make("github") },
+          },
+          provider: undefined as never,
+        }),
+    });
+    yield* service.list({ state: "open" });
+    assert.deepStrictEqual(reads, [{ host: "code.example.test", repositories: ["me/web"] }]);
+  }),
+);
+
 it.effect("lists GitHub Enterprise PRs for a stored unknown repository after host discovery", () =>
   Effect.gen(function* () {
     const service = yield* makeService({

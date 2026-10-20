@@ -351,6 +351,33 @@ function parseListCursor(raw: string): ListCursor | null {
   };
 }
 
+function withPullRequestRepository(project: OrchestrationProjectShell): OrchestrationProjectShell {
+  const identity = project.repositoryIdentity;
+  const origin = identity?.origin;
+  if (origin === undefined || identity == null) return project;
+
+  // Project grouping follows upstream, but browsing PRs belongs to the checkout's origin.
+  const remoteUrl = `https://${origin.canonicalKey}`;
+  const provider = detectSourceControlProviderFromRemoteUrl(remoteUrl);
+  const path = origin.canonicalKey.split("/").slice(1);
+  return {
+    ...project,
+    repositoryIdentity: {
+      canonicalKey: origin.canonicalKey,
+      displayName: origin.displayName ?? path.join("/"),
+      locator: { source: "git-remote", remoteName: "origin", remoteUrl },
+      provider:
+        provider?.kind ??
+        (origin.canonicalKey.split("/")[0] === identity.canonicalKey.split("/")[0]
+          ? identity.provider
+          : "unknown"),
+      ...(identity.rootPath === undefined ? {} : { rootPath: identity.rootPath }),
+      ...(path[0] === undefined ? {} : { owner: path[0] }),
+      ...(path.at(-1) === undefined ? {} : { name: path.at(-1)! }),
+    },
+  };
+}
+
 function listCursorKey(host: string, repository: string): string {
   return `${host} ${repository.toLowerCase()}`;
 }
@@ -701,6 +728,7 @@ export const make = Effect.gen(function* () {
           { concurrency: REPOSITORY_CONCURRENCY },
         ),
       ),
+      Effect.map((projects) => projects.map(withPullRequestRepository)),
       Effect.flatMap((projects) =>
         refineUnknownProjectKinds(projects, filter).pipe(
           Effect.map((refinedProviders) => ({ refinedProviders, projects })),
