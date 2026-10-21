@@ -950,15 +950,9 @@ export type SidebarV2TopStatusKind =
   | "woke"
   | "working";
 
-export function isSidebarThreadDone(
-  thread: Pick<SidebarThreadSummary, "latestRun" | "settledOverride">,
-): boolean {
-  return thread.latestRun?.status === "completed" && thread.settledOverride !== "settled";
-}
-
 export function resolveSidebarV2TopStatus(input: {
   readonly status: SidebarThreadStatus;
-  readonly isDone: boolean;
+  readonly isUnread: boolean;
   readonly isWoke: boolean;
 }): SidebarV2TopStatusKind | null {
   if (input.status === "working") {
@@ -979,7 +973,7 @@ export function resolveSidebarV2TopStatus(input: {
   if (input.isWoke) {
     return "woke";
   }
-  return input.isDone ? "done" : null;
+  return input.isUnread ? "done" : null;
 }
 
 export interface SidebarProjectIndicators {
@@ -1019,12 +1013,13 @@ function sidebarProjectIndicatorBucket(
 }
 
 // Buckets follow the thread row's top status: blocked is anything waiting on
-// the person (approval, input, failure, usage limit), done is a completed run
-// in an open thread. The open count covers every thread not settled, whatever its
+// the person (approval, input, failure, usage limit), done is an unseen
+// completion. The open count covers every thread not settled, whatever its
 // status.
 export function summarizeSidebarProjectIndicators(input: {
   readonly threads: readonly SidebarProjectIndicatorThread[];
   readonly projectKeyByMemberKey: ReadonlyMap<string, string>;
+  readonly localLastVisitedAtByThreadKey?: Readonly<Record<string, string>>;
 }): {
   readonly all: Readonly<SidebarProjectIndicators>;
   readonly byProjectKey: ReadonlyMap<string, Readonly<SidebarProjectIndicators>>;
@@ -1045,10 +1040,14 @@ export function summarizeSidebarProjectIndicators(input: {
       project.openThreadCount += 1;
       all.openThreadCount += 1;
     }
+    const lastVisitedAt = resolveThreadLastVisitedAt(
+      thread.lastVisitedAt,
+      input.localLastVisitedAtByThreadKey?.[`${thread.environmentId}:${thread.id}`],
+    );
     const bucket = sidebarProjectIndicatorBucket(
       resolveSidebarV2TopStatus({
         status: resolveSidebarThreadStatus(thread),
-        isDone: isSidebarThreadDone(thread),
+        isUnread: hasUnseenCompletion({ ...thread, lastVisitedAt }),
         isWoke: false,
       }),
     );

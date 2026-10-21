@@ -40,7 +40,6 @@ import {
   summarizeSidebarProjectIndicators,
   resolveScopedNewThreadProjectRef,
   resolveProjectActivationThreadKey,
-  isSidebarThreadDone,
   resolveThreadLastVisitedAt,
   resolveThreadStatusPill,
   resolveWorkingStartedAt,
@@ -544,38 +543,19 @@ function makeLatestRun(overrides?: {
   };
 }
 
-describe("persistent Done status", () => {
-  it("keeps Done after viewing a completed thread", () => {
-    const completed = {
-      ...makeThreadFixture(),
-      latestRun: makeLatestRun(),
-      settledOverride: null,
-    };
-    for (const lastVisitedAt of ["2026-03-09T10:04:00.000Z", "2026-03-09T10:06:00.000Z"]) {
-      const thread = { ...completed, lastVisitedAt };
-      expect(isSidebarThreadDone(thread)).toBe(true);
-      expect(
-        resolveSidebarV2TopStatus({
-          status: resolveSidebarThreadStatus(thread),
-          isDone: isSidebarThreadDone(thread),
-          isWoke: false,
-        }),
-      ).toBe("done");
-    }
-    expect(hasUnseenCompletion({ ...completed, lastVisitedAt: "2026-03-09T10:06:00.000Z" })).toBe(
-      false,
-    );
-  });
-
-  it("clears Done when the chat is closed or another run replaces the completion", () => {
-    expect(isSidebarThreadDone({ latestRun: makeLatestRun(), settledOverride: "settled" })).toBe(
-      false,
-    );
-    for (const status of ["running", "failed", "interrupted"] as const) {
-      const thread = { latestRun: { ...makeLatestRun(), status }, settledOverride: null };
-      expect(isSidebarThreadDone(thread)).toBe(false);
-    }
-    expect(isSidebarThreadDone({ latestRun: null, settledOverride: null })).toBe(false);
+describe("Done status", () => {
+  it.each([
+    { lastVisitedAt: "2026-03-09T10:04:00.000Z", expected: "done" },
+    { lastVisitedAt: "2026-03-09T10:06:00.000Z", expected: null },
+  ])("uses the completion visit watermark $lastVisitedAt", ({ lastVisitedAt, expected }) => {
+    const thread = { ...makeThreadFixture(), latestRun: makeLatestRun(), lastVisitedAt };
+    expect(
+      resolveSidebarV2TopStatus({
+        status: resolveSidebarThreadStatus(thread),
+        isUnread: hasUnseenCompletion(thread),
+        isWoke: false,
+      }),
+    ).toBe(expected);
   });
 });
 
@@ -1029,7 +1009,7 @@ describe("resolveSidebarThreadStatus", () => {
     expect(
       resolveSidebarThreadStatus({ ...idle, runtime: { ...limited, status: "completed" } }),
     ).toBe("ready");
-    expect(resolveSidebarV2TopStatus({ status: "limited", isDone: false, isWoke: false })).toBe(
+    expect(resolveSidebarV2TopStatus({ status: "limited", isUnread: false, isWoke: false })).toBe(
       "limited",
     );
     expect(
@@ -1069,7 +1049,7 @@ describe("resolveSidebarThreadStatus", () => {
   });
 
   it("keeps a waiting runtime visible ahead of unread and woke presentation", () => {
-    expect(resolveSidebarV2TopStatus({ status: "waiting", isDone: true, isWoke: true })).toBe(
+    expect(resolveSidebarV2TopStatus({ status: "waiting", isUnread: true, isWoke: true })).toBe(
       "waiting",
     );
   });
@@ -2275,7 +2255,7 @@ describe("unseen completion with background work", () => {
     expect(isUnread).toBe(true);
     expect(status).toBe(expected.status);
     expect(
-      resolveSidebarV2TopStatus({ status, isDone: isSidebarThreadDone(thread), isWoke: false }),
+      resolveSidebarV2TopStatus({ status, isUnread, isWoke: false }),
     ).toBe(expected.topStatus);
     expect(
       shouldRecedeSidebarThread({
@@ -2593,15 +2573,32 @@ describe("summarizeSidebarProjectIndicators", () => {
     expect(result.all).toEqual({ working: true, blocked: true, done: true, openThreadCount: 4 });
   });
 
-  it("keeps the project Done indicator after a visit and clears it on close", () => {
-    const thread = makeIndicatorThread("seen", "project-b", { latestRun: makeLatestRun() });
-    const summarize = (settledOverride: typeof thread.settledOverride) =>
+  it("clears the project Done indicator after viewing the completion", () => {
+    const summarize = (lastVisitedAt: string) =>
       summarizeSidebarProjectIndicators({
-        threads: [{ ...thread, settledOverride }],
+        threads: [
+          makeIndicatorThread("done", "project-b", { latestRun: makeLatestRun(), lastVisitedAt }),
+        ],
         projectKeyByMemberKey,
       });
-    expect(summarize(null).byProjectKey.get("group-b")?.done).toBe(true);
-    expect(summarize("settled").byProjectKey.get("group-b")?.done).toBe(false);
+    expect(summarize("2026-03-09T10:04:00.000Z").byProjectKey.get("group-b")?.done).toBe(true);
+    expect(summarize("2026-03-09T10:06:00.000Z").byProjectKey.get("group-b")?.done).toBe(false);
+  });
+
+  it("uses local visits for a server without visit tracking", () => {
+    const summarize = (lastVisitedAt: string) =>
+      summarizeSidebarProjectIndicators({
+        threads: [
+          makeIndicatorThread("done", "project-b", {
+            latestRun: makeLatestRun(),
+            lastVisitedAt: undefined,
+          }),
+        ],
+        projectKeyByMemberKey,
+        localLastVisitedAtByThreadKey: { [`${localEnvironmentId}:done`]: lastVisitedAt },
+      });
+    expect(summarize("2026-03-09T10:04:00.000Z").byProjectKey.get("group-b")?.done).toBe(true);
+    expect(summarize("2026-03-09T10:06:00.000Z").byProjectKey.get("group-b")?.done).toBe(false);
   });
 
   it("ignores archived threads and projects outside the groups", () => {

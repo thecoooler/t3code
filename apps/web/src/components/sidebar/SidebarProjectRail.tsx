@@ -8,6 +8,7 @@ import { readLocalApi } from "../../localApi";
 import { cn } from "../../lib/utils";
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import { useThreadShells } from "../../state/entities";
+import { useUiStateStore } from "../../uiStateStore";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { summarizeSidebarProjectIndicators, type SidebarProjectIndicators } from "../Sidebar.logic";
 import { SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
@@ -137,6 +138,7 @@ export function SidebarProjectRail(props: {
     if (!wasHidden && props.selectedProjectKey === projectKey) props.onSelectProject(null);
   };
   const threads = useThreadShells();
+  const localLastVisitedAtByThreadKey = useUiStateStore((state) => state.threadLastVisitedAtById);
   const projectKeyByMemberKey = new Map(
     props.projectGroups.flatMap((group) =>
       group.memberProjectRefs.map(
@@ -147,6 +149,7 @@ export function SidebarProjectRail(props: {
   const indicators = summarizeSidebarProjectIndicators({
     threads,
     projectKeyByMemberKey,
+    localLastVisitedAtByThreadKey,
   });
 
   return (
