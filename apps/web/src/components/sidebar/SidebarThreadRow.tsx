@@ -73,6 +73,7 @@ import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import {
+  isSidebarThreadDone,
   animateSidebarLayoutChanges,
   hasUnseenCompletion,
   resolveSidebarRowAccessibility,
@@ -634,6 +635,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     : null;
 
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
+  const isDone = isSidebarThreadDone(thread);
   const status = resolveSidebarThreadStatus(thread);
   const lastVisitedDate = lastVisitedAt === undefined ? null : parseTimestampDate(lastVisitedAt);
   const wokeAtDate = props.wokeAt === null ? null : parseTimestampDate(props.wokeAt);
@@ -643,7 +645,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     thread.settledOverride !== "settled";
   const shouldRecede = shouldRecedeSidebarThread({
     status,
-    isUnread,
+    isUnread: isUnread || isDone,
     isWoke,
     isActive: props.isActive,
     isSelected,
@@ -691,7 +693,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                       icon: "woke" as const,
                       className: "text-warning",
                     }
-                  : isUnread
+                  : isDone
                     ? {
                         label: "Done",
                         icon: "done" as const,

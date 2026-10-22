@@ -17,7 +17,13 @@ import {
   threadUndoClaimsShortcut,
   undoLatestThreadAction,
 } from "../hooks/showThreadUndoNotice";
-import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
+import {
+  getLocalStorageItem,
+  removeLocalStorageItem,
+  useLocalStorage,
+} from "../hooks/useLocalStorage";
+import { useIsMobile } from "../hooks/useMediaQuery";
+import { PROJECT_RAIL_COLLAPSED_STORAGE_KEY } from "./sidebar/SidebarProjectRail";
 import {
   isRichTextBoldShortcut,
   resolveShortcutCommand,
@@ -181,7 +187,7 @@ function SidebarControl() {
   return (
     <div
       className={cn(
-        "pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center",
+        "pointer-events-none fixed left-[calc(var(--workspace-controls-left)+var(--sidebar-offset,0px))] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center",
         isMobile && mobileSheetMounted && "hidden",
       )}
       data-sidebar-control=""
@@ -342,6 +348,15 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  const isMobile = useIsMobile();
+  const [projectRailHost, setProjectRailHost] = useState<HTMLDivElement | null>(null);
+  const [projectRailCollapsed] = useLocalStorage(
+    PROJECT_RAIL_COLLAPSED_STORAGE_KEY,
+    false,
+    Schema.Boolean,
+  );
+  const showProjectRail = !isMobile && !isOnSettings && !legacySidebarEnabled;
+  const projectRailWidth = showProjectRail ? (projectRailCollapsed ? 48 : 176) : 0;
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
   // Subscribed rather than read once: the clamp must track live window size,
@@ -350,7 +365,10 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const viewportWidth = useSyncExternalStore(subscribeToViewportWidth, readViewportWidth);
   const [brandWidth, setBrandWidth] = useState(0);
   const sidebarMinimumWidth = resolveThreadSidebarMinimumWidth(brandWidth);
-  const sidebarMaximumWidth = resolveThreadSidebarMaximumWidth(viewportWidth, sidebarMinimumWidth);
+  const sidebarMaximumWidth = resolveThreadSidebarMaximumWidth(
+    viewportWidth - projectRailWidth,
+    sidebarMinimumWidth,
+  );
   const resetSidebarWidth = () => {
     try {
       removeLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -370,6 +388,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   ) as CSSProperties;
   const sidebarProviderStyle = {
     "--sidebar-width": `${clampThreadSidebarWidth(sidebarWidth, sidebarMinimumWidth, sidebarMaximumWidth)}px`,
+    "--sidebar-offset": `${projectRailWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
     ...windowControlsInsetStyle,
   } as CSSProperties;
@@ -404,6 +423,14 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       >
         <SidebarBrandWidthProbe onWidthChange={setBrandWidth} />
         <ProjectProjectionRetention />
+        {showProjectRail ? (
+          <div
+            ref={setProjectRailHost}
+            className="relative z-20 h-full shrink-0 bg-sidebar surface-grain pt-[var(--workspace-topbar-height)] text-sidebar-foreground"
+            style={{ width: projectRailWidth }}
+            data-project-sidebar=""
+          />
+        ) : null}
         <Sidebar
           side="left"
           collapsible="offcanvas"
@@ -415,7 +442,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
             minWidth: sidebarMinimumWidth,
             shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
               nextWidth <= currentWidth ||
-              wrapper.clientWidth - nextWidth >= THREAD_MAIN_CONTENT_MIN_WIDTH,
+              wrapper.clientWidth - projectRailWidth - nextWidth >= THREAD_MAIN_CONTENT_MIN_WIDTH,
             storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
             onResize: setSidebarWidth,
           }}
@@ -429,7 +456,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           ) : legacySidebarEnabled ? (
             <LegacyThreadSidebar routeReveal={sidebarRouteReveal} />
           ) : (
-            <ThreadSidebar routeReveal={sidebarRouteReveal} />
+            <ThreadSidebar routeReveal={sidebarRouteReveal} projectRailHost={projectRailHost} />
           )}
           <SidebarRail onDoubleClick={resetSidebarWidth} />
         </Sidebar>

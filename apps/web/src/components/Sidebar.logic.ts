@@ -8,7 +8,12 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { defaultAnimateLayoutChanges, type AnimateLayoutChanges } from "@dnd-kit/sortable";
 import { threadSearchMatchKey } from "@t3tools/client-runtime/state/thread-search";
-import type { ContextMenuItem, EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type {
+  ContextMenuItem,
+  EnvironmentId,
+  ScopedProjectRef,
+  ThreadId,
+} from "@t3tools/contracts";
 import type { SidebarProjectSortOrder, SidebarThreadSortOrder } from "@t3tools/contracts/settings";
 import type { AsyncResult } from "effect/reactivity";
 import { planPinnedReorder } from "@t3tools/client-runtime/state/thread-sort";
@@ -926,9 +931,15 @@ export type SidebarV2TopStatusKind =
   | "woke"
   | "working";
 
+export function isSidebarThreadDone(
+  thread: Pick<SidebarThreadSummary, "latestRun" | "settledOverride">,
+): boolean {
+  return thread.latestRun?.status === "completed" && thread.settledOverride !== "settled";
+}
+
 export function resolveSidebarV2TopStatus(input: {
   readonly status: SidebarThreadStatus;
-  readonly isUnread: boolean;
+  readonly isDone: boolean;
   readonly isWoke: boolean;
 }): SidebarV2TopStatusKind | null {
   if (input.status === "working") {
@@ -949,7 +960,123 @@ export function resolveSidebarV2TopStatus(input: {
   if (input.isWoke) {
     return "woke";
   }
-  return input.isUnread ? "done" : null;
+  return input.isDone ? "done" : null;
+}
+
+export interface SidebarProjectIndicators {
+  working: boolean;
+  blocked: boolean;
+  done: boolean;
+  openThreadCount: number;
+}
+
+type SidebarProjectIndicatorThread = Pick<
+  SidebarThreadSummary,
+  "archivedAt" | "lineage" | "environmentId" | "projectId" | "id" | "settledOverride"
+> &
+  ThreadStatusInput &
+  SidebarThreadStatusInput;
+
+function emptySidebarProjectIndicators(): SidebarProjectIndicators {
+  return { working: false, blocked: false, done: false, openThreadCount: 0 };
+}
+
+function sidebarProjectIndicatorBucket(
+  topStatus: SidebarV2TopStatusKind | null,
+): "working" | "blocked" | "done" | null {
+  switch (topStatus) {
+    case "working":
+      return "working";
+    case "approval":
+    case "input":
+    case "failed":
+    case "limited":
+      return "blocked";
+    case "done":
+      return "done";
+    default:
+      return null;
+  }
+}
+
+// Buckets follow the thread row's top status: blocked is anything waiting on
+// the person (approval, input, failure, usage limit), done is a completed run
+// in an open thread. The open count covers every thread not settled, whatever its
+// status.
+export function summarizeSidebarProjectIndicators(input: {
+  readonly threads: readonly SidebarProjectIndicatorThread[];
+  readonly projectKeyByMemberKey: ReadonlyMap<string, string>;
+}): {
+  readonly all: Readonly<SidebarProjectIndicators>;
+  readonly byProjectKey: ReadonlyMap<string, Readonly<SidebarProjectIndicators>>;
+} {
+  const all = emptySidebarProjectIndicators();
+  const byProjectKey = new Map<string, SidebarProjectIndicators>();
+  for (const thread of filterSidebarV2VisibleThreads(input.threads, null)) {
+    const projectKey = input.projectKeyByMemberKey.get(
+      `${thread.environmentId}:${thread.projectId}`,
+    );
+    if (projectKey === undefined) continue;
+    let project = byProjectKey.get(projectKey);
+    if (project === undefined) {
+      project = emptySidebarProjectIndicators();
+      byProjectKey.set(projectKey, project);
+    }
+    if (thread.settledOverride !== "settled") {
+      project.openThreadCount += 1;
+      all.openThreadCount += 1;
+    }
+    const bucket = sidebarProjectIndicatorBucket(
+      resolveSidebarV2TopStatus({
+        status: resolveSidebarThreadStatus(thread),
+        isDone: isSidebarThreadDone(thread),
+        isWoke: false,
+      }),
+    );
+    if (bucket === null) continue;
+    project[bucket] = true;
+    all[bucket] = true;
+  }
+  return { all, byProjectKey };
+}
+
+// A project scope can span machines. Stay on the machine already in use when
+// it hosts the project, then prefer the primary environment.
+export function resolveScopedNewThreadProjectRef(input: {
+  readonly memberProjectRefs: readonly ScopedProjectRef[];
+  readonly contextProjectRef: ScopedProjectRef | null;
+  readonly primaryEnvironmentId: EnvironmentId | null;
+}): ScopedProjectRef | null {
+  const { memberProjectRefs, contextProjectRef, primaryEnvironmentId } = input;
+  return (
+    memberProjectRefs.find(
+      (ref) =>
+        ref.environmentId === contextProjectRef?.environmentId &&
+        ref.projectId === contextProjectRef.projectId,
+    ) ??
+    memberProjectRefs.find((ref) => ref.environmentId === primaryEnvironmentId) ??
+    memberProjectRefs[0] ??
+    null
+  );
+}
+
+// A remembered or visible settled thread must never win automatic activation.
+export function resolveProjectActivationThreadKey(input: {
+  readonly rememberedThreadKey: string | undefined;
+  readonly nonSettledThreadKeys: ReadonlySet<string>;
+  readonly orderedThreadKeys: readonly string[];
+}): string | null {
+  if (
+    input.rememberedThreadKey !== undefined &&
+    input.nonSettledThreadKeys.has(input.rememberedThreadKey)
+  ) {
+    return input.rememberedThreadKey;
+  }
+  return (
+    input.orderedThreadKeys.find((key) => input.nonSettledThreadKeys.has(key)) ??
+    input.nonSettledThreadKeys.values().next().value ??
+    null
+  );
 }
 
 export function firstValidTimestampMs(
@@ -1302,18 +1429,22 @@ export function sortLogicalProjectsForSidebar<
 }
 
 export function sortSidebarV2ProjectGroups<
-  TProject extends LogicalSidebarProject,
+  TProject extends LogicalSidebarProject & { readonly isScratch?: boolean },
   TThread extends ScopedSidebarThread & Pick<SidebarThreadSummary, "lineage">,
 >(
   projects: readonly TProject[],
   threads: readonly TThread[],
   sortOrder: SidebarProjectSortOrder,
 ): TProject[] {
-  return sortLogicalProjectsForSidebar(
+  const sorted = sortLogicalProjectsForSidebar(
     projects,
     filterSidebarV2VisibleThreads(threads, null),
     sortOrder,
   );
+  return [
+    ...sorted.filter((project) => project.isScratch),
+    ...sorted.filter((project) => !project.isScratch),
+  ];
 }
 
 export function sortScopedProjectsForSidebar<

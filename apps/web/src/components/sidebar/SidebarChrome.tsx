@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import { ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -24,7 +24,7 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
-import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
+import { useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
@@ -135,17 +135,27 @@ function SidebarUtilityItem({
   icon,
   label,
   onClick,
+  active,
+  alignEnd = false,
 }: {
   icon: ReactNode;
   label: string;
   onClick: () => void;
+  active: boolean;
+  alignEnd?: boolean;
 }) {
   return (
-    <SidebarMenuItem className="shrink-0">
+    <SidebarMenuItem className={cn("shrink-0", alignEnd && "ml-auto")}>
       <Tooltip>
         <TooltipTrigger
           render={
-            <SidebarMenuButton aria-label={label} onClick={onClick} size="icon">
+            <SidebarMenuButton
+              aria-label={label}
+              aria-current={active ? "page" : undefined}
+              isActive={active}
+              onClick={onClick}
+              size="icon"
+            >
               {icon}
             </SidebarMenuButton>
           }
@@ -160,8 +170,19 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
   const { isMobile, setOpenMobile } = useSidebar();
-  const isOnUtilityPage = useLocation({
-    select: (location) => isSidebarUtilityPage(location.pathname),
+  const section = useLocation({
+    select: ({ pathname }) => {
+      if (pathname === "/pull-requests" || pathname.startsWith("/pull-requests/")) return "pulls";
+      if (pathname === "/usage" || pathname.startsWith("/usage/")) return "usage";
+      if (
+        pathname === "/settings" ||
+        pathname.startsWith("/settings/") ||
+        pathname.startsWith("/projects/")
+      ) {
+        return "settings";
+      }
+      return "threads";
+    },
   });
   const pullRequestsSupported = usePullRequestsSupported();
   const closeMobileSidebar = () => {
@@ -171,6 +192,10 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   };
   const handlePullRequestsClick = () => {
     closeMobileSidebar();
+    if (section === "pulls") {
+      void navigateToMainApp();
+      return;
+    }
     void navigate({
       to: "/pull-requests",
       search: readPullRequestListPreferences(),
@@ -178,52 +203,46 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   };
   const handleSettingsClick = () => {
     closeMobileSidebar();
+    if (section === "settings") {
+      void navigateToMainApp();
+      return;
+    }
     void navigate({ to: "/settings" });
   };
 
   const handleUsageClick = () => {
-    if (isMobile) {
-      setOpenMobile(false);
+    closeMobileSidebar();
+    if (section === "usage") {
+      void navigateToMainApp();
+      return;
     }
     void navigate({ to: "/usage" });
   };
 
-  const handleBackClick = () => {
-    closeMobileSidebar();
-    void navigateToMainApp();
-  };
-
   return (
     <SidebarMenu className="flex-row items-center">
-      {isOnUtilityPage ? (
-        <SidebarMenuItem className="min-w-0 flex-1">
-          <SidebarMenuButton onClick={handleBackClick}>
-            <ArrowLeftIcon />
-            <span>Back</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      ) : (
-        <>
-          <SidebarUtilityItem
-            icon={<SettingsIcon />}
-            label="Settings"
-            onClick={handleSettingsClick}
-          />
-          {pullRequestsSupported ? (
-            <SidebarUtilityItem
-              icon={<PullRequestGlyph.pullRequest />}
-              label="Pull Requests"
-              onClick={handlePullRequestsClick}
-            />
-          ) : null}
-          <SidebarUtilityItem
-            icon={<ChartNoAxesColumnIcon />}
-            label="Usage"
-            onClick={handleUsageClick}
-          />
-        </>
-      )}
+      {pullRequestsSupported ? (
+        <SidebarUtilityItem
+          icon={<PullRequestGlyph.pullRequest />}
+          label="Pull Requests"
+          active={section === "pulls"}
+          onClick={handlePullRequestsClick}
+        />
+      ) : null}
+      <SidebarUtilityItem
+        icon={<ChartNoAxesColumnIcon />}
+        label="Usage"
+        active={section === "usage"}
+        onClick={handleUsageClick}
+      />
       <SidebarUpdatePill />
+      <SidebarUtilityItem
+        icon={<SettingsIcon />}
+        label="Settings"
+        active={section === "settings"}
+        alignEnd
+        onClick={handleSettingsClick}
+      />
     </SidebarMenu>
   );
 });
