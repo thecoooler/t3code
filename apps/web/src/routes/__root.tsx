@@ -197,6 +197,7 @@ function RootRouteView() {
           <ContrastAppearanceSync />
           <EnvironmentThemeSync />
           <GlassAppearanceSync />
+          <CornerRadiusAppearanceSync />
           <FontAppearanceSync />
           <ProviderAuthCallbackCoordinator />
           <CustomSnoozeDialogHost />
@@ -237,6 +238,7 @@ function RootRouteView() {
         <ContrastAppearanceSync />
         <EnvironmentThemeSync />
         <GlassAppearanceSync />
+        <CornerRadiusAppearanceSync />
         <FontAppearanceSync />
         <ProviderAuthCallbackCoordinator />
         <ChatGptWelcomeCoordinator />
@@ -317,6 +319,16 @@ function GlassAppearanceSync() {
       style.removeProperty("--glass-blur");
     }
   }, [glassOpacity]);
+
+  return null;
+}
+
+function CornerRadiusAppearanceSync() {
+  const cornerRadius = useClientSettings((settings) => settings.cornerRadius);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--radius-scale", String(cornerRadius / 100));
+  }, [cornerRadius]);
 
   return null;
 }
