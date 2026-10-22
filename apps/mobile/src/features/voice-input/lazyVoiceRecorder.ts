@@ -11,7 +11,8 @@ export interface VoiceRecordingInput {
 export interface NativeVoiceRecorder<TStatus, TRecorderState> {
   readonly uri: string | null;
   prepareToRecordAsync(): Promise<void>;
-  record(options: { readonly forDuration: number }): void;
+  record(options?: { readonly forDuration: number }): void;
+  pause?(): void;
   stop(): Promise<void>;
   getStatus(): TRecorderState;
   addListener(
@@ -69,6 +70,15 @@ export function createLazyVoiceRecorder<TStatus, TRecorderState>(input: {
     record(options) {
       if (!recorder) throw new Error("Voice recorder is not prepared.");
       recorder.record(options);
+    },
+    pause() {
+      if (!recorder?.pause) throw new Error("Voice recorder cannot pause.");
+      recorder.pause();
+    },
+    resume() {
+      if (!recorder) throw new Error("Voice recorder is not prepared.");
+      // Expo preserves the original audio duration limit when resuming without options.
+      recorder.record();
     },
     stop() {
       return recorder ? track(recorder.stop()) : Promise.resolve();
