@@ -227,6 +227,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["transparent transparency solid menus dialogs composer"],
   },
   {
+    // Prefixed because the slider control already owns the `corner-radius` id.
+    id: "setting-corner-radius",
+    title: "Corner radius",
+    to: "/settings/appearance",
+    searchTerms: ["rounded rounding roundness corners square border radius"],
+  },
+  {
     id: "diff-color-scheme",
     title: "Diff colors",
     to: "/settings/appearance",
