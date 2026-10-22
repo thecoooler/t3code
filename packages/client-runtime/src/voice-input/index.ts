@@ -17,3 +17,9 @@ export {
   type VoiceTranscriptionErrorCode,
   type VoiceTranscriptionOptions,
 } from "./transcription.ts";
+export {
+  DEFAULT_OPENROUTER_VOICE_SETTINGS,
+  parseOpenRouterVoiceSettings,
+  createOpenRouterVoiceTranscriber,
+  type OpenRouterVoiceSettings,
+} from "./openrouter.ts";

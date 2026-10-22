@@ -128,6 +128,8 @@ function EdgeDictationPill(props: { readonly collapseRef: RefObject<(() => void)
                   tintColorClassName="accent-danger-foreground"
                   type="monochrome"
                 />
+              ) : phase === "paused" ? (
+                <SymbolView name="pause.fill" size={16} tintColorClassName="accent-icon" />
               ) : phase === "recording" ? (
                 <>
                   <View className="size-2 rounded-full bg-danger-foreground" />
@@ -179,8 +181,20 @@ function EdgeDictationPill(props: { readonly collapseRef: RefObject<(() => void)
                 {isError ? presentation.statusLabel : label}
               </Text>
             </Pressable>
-            {phase === "recording" ? (
+            {phase === "recording" || phase === "paused" ? (
               <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={phase === "paused" ? "Resume recording" : "Pause recording"}
+                  onPress={voice.togglePause}
+                  className="size-[30px] items-center justify-center"
+                >
+                  <SymbolView
+                    name={phase === "paused" ? "play.fill" : "pause.fill"}
+                    size={14}
+                    tintColorClassName="accent-icon"
+                  />
+                </Pressable>
                 <CompactVoiceWaveform audioLevels={voice.audioLevels} />
                 <DictationElapsedTime
                   className="text-foreground-muted"

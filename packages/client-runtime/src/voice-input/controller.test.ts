@@ -25,6 +25,8 @@ class TestRecorder implements VoiceRecorder {
   uri: string | null = "file:///voice.m4a";
   readonly prepareToRecordAsync = vi.fn(async () => undefined);
   readonly record = vi.fn();
+  readonly pause = vi.fn();
+  readonly resume = vi.fn();
   readonly stop = vi.fn(async () => undefined);
 }
 
@@ -109,6 +111,32 @@ describe("resolveTranscriptCommit", () => {
 
 describe("VoiceInputController", () => {
   beforeEach(() => resetVoiceInputGlobalsForTests());
+
+  it("pauses and resumes the same recording before transcribing", async () => {
+    const { controller, recorder, commits } = createHarness();
+    await controller.start();
+    controller.togglePause();
+    expect(controller.currentState.phase).toBe("paused");
+    expect(recorder.pause).toHaveBeenCalledOnce();
+    controller.togglePause();
+    expect(controller.currentState.phase).toBe("recording");
+    expect(recorder.resume).toHaveBeenCalledOnce();
+    expect(recorder.record).toHaveBeenCalledOnce();
+    controller.togglePause();
+    await controller.stop();
+    expect(commits).toHaveLength(1);
+    expect(controller.currentState.phase).toBe("idle");
+  });
+
+  it("discards paused audio when the app moves to the background", async () => {
+    const { controller, commits, deleted } = createHarness();
+    await controller.start();
+    controller.togglePause();
+    await controller.appMovedToBackground();
+    expect(controller.currentState.phase).toBe("error");
+    expect(commits).toHaveLength(0);
+    expect(deleted).toEqual(["file:///voice.m4a"]);
+  });
 
   it("checks support and permission before recording", async () => {
     const unsupported = createHarness({ getTranscriber: () => null });
