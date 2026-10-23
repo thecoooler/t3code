@@ -9,6 +9,7 @@ import {
   type EnvironmentMachineKind,
   type ProjectEntry,
   type ProviderDriverKind,
+  type ProviderInstanceId,
   type PullRequestContextMetadata,
   type ScopedThreadRef,
   type ServerProviderSkill,
@@ -31,6 +32,7 @@ import { Badge } from "../ui/badge";
 import { Command, CommandGroup, CommandItem, CommandList } from "../ui/command";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { PierreEntryIcon } from "./PierreEntryIcon";
+import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { ComposerBanner } from "./ComposerBanner";
 import { resolvePullRequestState } from "../pullRequest/pullRequestPresentation";
 
@@ -86,6 +88,34 @@ export type ComposerCommandItem =
       type: "environment";
       environmentId: EnvironmentId;
       machine: EnvironmentMachineKind;
+      label: string;
+      description: string;
+    }
+  | {
+      id: string;
+      type: "model";
+      instanceId: ProviderInstanceId;
+      driverKind: ProviderDriverKind;
+      instanceDisplayName: string;
+      model: string;
+      modelName: string;
+      accentColor?: string | undefined;
+      iconUrl?: string | undefined;
+      agentId?: string | undefined;
+      label: string;
+      description: string;
+      badge?: "new" | undefined;
+      isCustom?: boolean;
+    }
+  | {
+      id: string;
+      type: "provider";
+      instanceId: ProviderInstanceId;
+      driverKind: ProviderDriverKind;
+      instanceDisplayName: string;
+      accentColor?: string | undefined;
+      iconUrl?: string | undefined;
+      agentId?: string | undefined;
       label: string;
       description: string;
     };
@@ -161,7 +191,7 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
                   (props.triggerKind === "skill"
                     ? "No skills found. Try / to browse provider commands."
                     : props.triggerKind === "path"
-                      ? "No matching files or folders."
+                      ? "No matching files, models, or threads."
                       : "No matching command."))}
             </p>
           </div>
@@ -221,6 +251,16 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
           className="size-4 shrink-0 text-secondary-label"
         />
       ) : null}
+      {props.item.type === "model" || props.item.type === "provider" ? (
+        <ProviderInstanceIcon
+          driverKind={props.item.driverKind}
+          displayName={props.item.instanceDisplayName}
+          accentColor={props.item.accentColor}
+          acpRegistryAgentId={props.item.agentId}
+          acpRegistryIconUrl={props.item.iconUrl}
+          className="size-4 shrink-0"
+        />
+      ) : null}
       {pullRequestPresentation ? (
         <pullRequestPresentation.Icon
           role="img"
@@ -248,6 +288,21 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
             showSkillSuffix={props.triggerKind === "skill"}
           />
         ) : null}
+        {props.item.type === "provider" ? (
+          <Badge className="ms-auto" variant="secondary">
+            Provider
+          </Badge>
+        ) : null}
+        {props.item.type === "model" && props.item.badge === "new" ? (
+          <Badge className="ms-auto" variant="secondary">
+            New
+          </Badge>
+        ) : null}
+        {props.item.type === "model" && props.item.isCustom ? (
+          <Badge className="ms-auto" variant="secondary">
+            Custom
+          </Badge>
+        ) : null}
       </span>
     </CommandItem>
   );
@@ -259,7 +314,7 @@ export function composerSuggestionOptionId(listId: string, itemId: string): stri
 }
 
 const LISTBOX_LABEL_BY_TRIGGER: Record<ComposerTriggerKind, string> = {
-  path: "Files and folders",
+  path: "Files, models, and threads",
   "pull-request": "Pull requests",
   "slash-command": "Commands",
   skill: "Skills",

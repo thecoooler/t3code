@@ -96,6 +96,8 @@ import { parseComposerContextHref } from "@t3tools/shared/composerContextReferen
 import { parseThreadLinkHref } from "@t3tools/shared/threadLinks";
 import { AssistantCitationChip } from "./chat/AssistantCitationChip";
 import { MarkdownThreadLink } from "./chat/MarkdownThreadLink";
+import { isModelOrProviderTagHref, parseModelOrProviderTagHref } from "../modelTags";
+import { ModelTagChip } from "./chat/ModelTagChip";
 import { mathKind } from "@t3tools/shared/markdownMath";
 import remarkMath from "remark-math";
 import {
@@ -397,6 +399,7 @@ function markdownUrlTransform(href: string) {
   if (parseComposerContextHref(href)) return href;
   if (parseThreadLinkHref(href)) return href;
   if (isWindowsDrivePathHref(href)) return href;
+  if (isModelOrProviderTagHref(href)) return href;
   return rewriteMarkdownFileUriHref(href) ?? defaultUrlTransform(href);
 }
 
@@ -445,6 +448,7 @@ function fileLinkSourcesKey(
 ): string {
   const hrefs = extractMarkdownLinkHrefs(renderCodexInlineDirectivesAsMarkdown(text))
     .filter((href) => !parseComposerContextHref(href))
+    .filter((href) => !isModelOrProviderTagHref(href))
     .map(normalizeMarkdownLinkHrefKey)
     .filter((href) => resolveMarkdownFileLinkMeta(href, cwd, imageBaseDir ?? cwd));
   const spans = extractInlineCodeSpans(text).filter((span) =>
@@ -1091,6 +1095,20 @@ const CHAT_MARKDOWN_COMPONENTS = {
         renderContextReference({ ...contextReference, label })
       ) : (
         <span>{label}</span>
+      );
+    }
+    const modelTag = href ? parseModelOrProviderTagHref(href) : null;
+    if (modelTag) {
+      const label =
+        hastPlainTextDeep(node) ||
+        (modelTag.kind === "model" ? modelTag.model : modelTag.instanceId);
+      return (
+        <ModelTagChip
+          tagKind={modelTag.kind}
+          instanceId={modelTag.instanceId}
+          model={modelTag.kind === "model" ? modelTag.model : undefined}
+          label={label}
+        />
       );
     }
     const normalizedHref = href ? normalizeMarkdownLinkHrefKey(href) : "";

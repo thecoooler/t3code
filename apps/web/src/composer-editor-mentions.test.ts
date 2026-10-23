@@ -243,6 +243,34 @@ describe("splitPromptIntoComposerSegments", () => {
       { type: "text", text: " please" },
     ]);
   });
+
+  it("splits model and provider tags into model-tag segments", () => {
+    expect(
+      splitPromptIntoComposerSegments(
+        "Ask [Gemini 2.5 Flash](t3-model://google/gemini-2.5-flash) or [Anthropic](t3-provider://anthropic) please",
+      ),
+    ).toEqual([
+      { type: "text", text: "Ask " },
+      {
+        type: "model-tag",
+        tagKind: "model",
+        instanceId: "google",
+        model: "gemini-2.5-flash",
+        label: "Gemini 2.5 Flash",
+        source: "[Gemini 2.5 Flash](t3-model://google/gemini-2.5-flash)",
+      },
+      { type: "text", text: " or " },
+      {
+        type: "model-tag",
+        tagKind: "provider",
+        instanceId: "anthropic",
+        model: undefined,
+        label: "Anthropic",
+        source: "[Anthropic](t3-provider://anthropic)",
+      },
+      { type: "text", text: " please" },
+    ]);
+  });
 });
 
 describe("selectionTouchesMentionBoundary", () => {
