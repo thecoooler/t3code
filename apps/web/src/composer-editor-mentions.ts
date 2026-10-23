@@ -6,6 +6,8 @@ import {
   type ComposerInlineToken,
 } from "@t3tools/shared/composerInlineTokens";
 
+import { collectModelAndProviderTags } from "./modelTags";
+
 export type ComposerPromptSegment =
   | {
       type: "text";
@@ -30,6 +32,14 @@ export type ComposerPromptSegment =
       type: "context-reference";
       kind: string;
       contextId: string;
+      label: string;
+      source: string;
+    }
+  | {
+      type: "model-tag";
+      tagKind: "model" | "provider";
+      instanceId: string;
+      model?: string;
       label: string;
       source: string;
     };
@@ -79,12 +89,14 @@ export function collectComposerPromptInlineTokens(text: string) {
   const tokens = collectComposerInlineTokens(text);
   const citations = collectAssistantCitations(text);
   const references = collectComposerContextReferences(text);
-  if (citations.length === 0 && references.length === 0) return tokens;
+  const modelTags = collectModelAndProviderTags(text);
+  if (citations.length === 0 && references.length === 0 && modelTags.length === 0) return tokens;
 
   // An unfinished @ mention can otherwise consume the start of a link label.
   const links = [
     ...citations.map((match) => ({ ...match, type: "citation" as const })),
     ...references.map((match) => ({ ...match, type: "context-reference" as const })),
+    ...modelTags.map((match) => ({ ...match, type: "model-tag" as const })),
   ];
   return [
     ...tokens.filter(
@@ -118,6 +130,15 @@ function splitPromptTextIntoComposerSegments(text: string): ComposerPromptSegmen
         type: "context-reference",
         kind: match.kind,
         contextId: match.contextId,
+        label: match.label,
+        source: match.source,
+      });
+    } else if (match.type === "model-tag") {
+      segments.push({
+        type: "model-tag",
+        tagKind: match.tagKind,
+        instanceId: match.instanceId,
+        model: match.model,
         label: match.label,
         source: match.source,
       });
