@@ -28,6 +28,8 @@ const contextChipVariants = cva(
         skill: "[--context-chip-accent:oklch(0.62_0.16_322)]",
         thread: "[--context-chip-accent:oklch(0.62_0.12_190)]",
         citation: "[--context-chip-accent:oklch(0.62_0.16_259)]",
+        model: "[--context-chip-accent:oklch(0.62_0.14_175)]",
+        provider: "[--context-chip-accent:oklch(0.62_0.14_210)]",
       },
       state: {
         unresolved: "border-dashed",
@@ -53,6 +55,8 @@ const contextChipVariants = cva(
           "skill",
           "thread",
           "citation",
+          "model",
+          "provider",
         ],
         className:
           "[--context-chip-border:color-mix(in_oklab,var(--context-chip-accent)_34%,var(--contrast-border))] [--context-chip-border-hover:color-mix(in_oklab,var(--context-chip-accent)_48%,var(--contrast-border))] [--context-chip-foreground:color-mix(in_oklab,var(--context-chip-accent)_22%,var(--contrast-foreground))] border-(--context-chip-border) bg-(--context-chip-accent)/11 text-(--context-chip-foreground) [button:enabled&,a&]:hover:border-(--context-chip-border-hover) [button:enabled&,a&]:hover:bg-(--context-chip-accent)/17",
