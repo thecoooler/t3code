@@ -75,6 +75,13 @@ const schema = getSchemaByResolvedExtensions(
       label: { default: "" },
       source: { default: "" },
     }),
+    stubAtom("composer-model-tag", {
+      tagKind: { default: "model" },
+      instanceId: { default: "" },
+      model: { default: "" },
+      label: { default: "" },
+      source: { default: "" },
+    }),
     TaskList,
     ComposerTaskItemExtension,
     ComposerCodeBlockExtension,
@@ -193,6 +200,13 @@ const plainSchema = getSchemaByResolvedExtensions(
     stubAtom("composer-context-reference", {
       kind: { default: "" },
       contextId: { default: "" },
+      label: { default: "" },
+      source: { default: "" },
+    }),
+    stubAtom("composer-model-tag", {
+      tagKind: { default: "model" },
+      instanceId: { default: "" },
+      model: { default: "" },
       label: { default: "" },
       source: { default: "" },
     }),
