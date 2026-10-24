@@ -11,6 +11,16 @@ export function useThreadListV2ShelfPreferences() {
     loaded && preferencesResult.value.threadListSnoozedShelfExpanded === true;
   const settledShelfExpanded =
     loaded && preferencesResult.value.threadListSettledShelfExpanded === true;
+  const archivedShelfExpanded =
+    loaded && preferencesResult.value.threadListArchivedShelfExpanded === true;
+  const toggleArchivedShelf = () => {
+    if (!loaded) return;
+    savePreferences({
+      transform: (current) => ({
+        threadListArchivedShelfExpanded: current.threadListArchivedShelfExpanded !== true,
+      }),
+    });
+  };
   const workingShelfEnabled = loaded && preferencesResult.value.workingShelfEnabled === true;
   const workingShelfExpanded =
     loaded && preferencesResult.value.threadListWorkingShelfExpanded === true;
@@ -44,6 +54,8 @@ export function useThreadListV2ShelfPreferences() {
 
   return {
     loaded,
+    archivedShelfExpanded,
+    toggleArchivedShelf,
     settledShelfExpanded,
     snoozedShelfExpanded,
     workingShelfEnabled,

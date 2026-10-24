@@ -1,3 +1,6 @@
+import { ArchivedThreadShelf } from "./ArchivedThreadShelf";
+import { useArchivedThreadSnapshots } from "../archive/useArchivedThreadSnapshots";
+import { scopeThreadShell } from "@t3tools/client-runtime/state/shell";
 import { useActiveNewTask } from "../../state/active-new-task";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { useAndroidControlSizing } from "../../components/ui/useAndroidControlSizing";
@@ -296,6 +299,7 @@ export function HomeScreen(props: HomeScreenProps) {
           )
         ? [props.selectedEnvironmentId]
         : [];
+  const archive = useArchivedThreadSnapshots(searchEnvironmentIds);
   const threadSearch = useThreadSearch(searchEnvironmentIds, props.searchQuery);
   const threadSearchMatchByKey = (() => {
     const matches = new Map<string, EnvironmentThreadSearchMatch>();
@@ -411,6 +415,18 @@ export function HomeScreen(props: HomeScreenProps) {
             scopedProjectKey(projectRef.environmentId, projectRef.projectId),
           ),
         );
+  const archivedThreads = archive.snapshots
+    .flatMap(({ environmentId, snapshot }) =>
+      snapshot.threads
+        .filter(
+          (thread) =>
+            thread.lineage.relationshipToParent !== "subagent" &&
+            (v2ScopedProjectKeys === null ||
+              v2ScopedProjectKeys.has(scopedProjectKey(environmentId, thread.projectId))),
+        )
+        .map((thread) => scopeThreadShell(environmentId, thread)),
+    )
+    .sort((a, b) => (b.archivedAt ?? "").localeCompare(a.archivedAt ?? ""));
   const handleSettleThread = props.onSettleThread;
   const handleSnoozeThread = props.onSnoozeThread;
   const handleUnsnoozeThread = props.onUnsnoozeThread;
@@ -732,7 +748,7 @@ export function HomeScreen(props: HomeScreenProps) {
     projectCount: props.projects.length,
   });
 
-  if (!hasAnyThreads) {
+  if (!hasAnyThreads && archivedThreads.length === 0) {
     return (
       <View className={containerClassName}>
         <View
@@ -823,7 +839,7 @@ export function HomeScreen(props: HomeScreenProps) {
       />
     );
 
-  if (Platform.OS === "android" && threadListV2Items.length === 0) {
+  if (Platform.OS === "android" && threadListV2Items.length === 0 && archivedThreads.length === 0) {
     return (
       <View className="flex-1 bg-header">
         <View
@@ -866,14 +882,28 @@ export function HomeScreen(props: HomeScreenProps) {
               extraData={v2ExtraData}
               ListHeaderComponent={v2ListHeader}
               ListFooterComponent={
-                settledShelfExpanded && threadListV2Layout.hiddenSettledCount > 0 ? (
-                  <ThreadListV2ShowMoreRow
-                    hiddenCount={threadListV2Layout.hiddenSettledCount}
-                    onPress={showMoreSettled}
-                  />
-                ) : null
+                <>
+                  {settledShelfExpanded && threadListV2Layout.hiddenSettledCount > 0 ? (
+                    <ThreadListV2ShowMoreRow
+                      hiddenCount={threadListV2Layout.hiddenSettledCount}
+                      onPress={showMoreSettled}
+                    />
+                  ) : null}
+                  {!hasSearchQuery ? (
+                    <ArchivedThreadShelf
+                      threads={archivedThreads}
+                      onSelectThread={props.onSelectThread}
+                      error={archive.error}
+                      isLoading={archive.isLoading}
+                      onRefresh={archive.refresh}
+                      pane={primaryColumn ? "sidebar" : "screen"}
+                    />
+                  ) : null}
+                </>
               }
-              ListEmptyComponent={v2ListEmpty}
+              ListEmptyComponent={
+                archivedThreads.length > 0 && !hasSearchQuery ? undefined : v2ListEmpty
+              }
               style={{ flex: 1 }}
               automaticallyAdjustsScrollIndicatorInsets={Platform.OS === "ios"}
               // UIKit owns the bar's inset, so a minimizing bar and a resized column move
