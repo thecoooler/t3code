@@ -1,3 +1,4 @@
+import { SidebarArchivedThreads } from "./sidebar/SidebarArchivedThreads";
 import { type EnvironmentId, type ScopedProjectRef } from "@t3tools/contracts";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
@@ -3146,6 +3147,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 </SortableContext>
               </DndContext>
             </TooltipProvider>
+          ) : null}
+          {!isSearchingThreads ? (
+            <SidebarArchivedThreads
+              environmentIds={Array.from(serverConfigs.keys())}
+              scopedProjectKeys={scopedProjectKeys}
+            />
           ) : null}
           {!isSearchingThreads &&
           visibleDraftSessionCount === 0 &&

@@ -83,6 +83,7 @@ export interface Preferences {
     readonly model: string;
   }>;
   readonly threadListSettledShelfExpanded?: boolean;
+  readonly threadListArchivedShelfExpanded?: boolean;
   readonly threadListSnoozedShelfExpanded?: boolean;
   readonly threadListWorkingShelfExpanded?: boolean;
   readonly threadListFilters?: ThreadListFilters;
@@ -155,6 +156,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     workingShelfEnabled?: boolean;
     modelFavorites?: Preferences["modelFavorites"];
     threadListSettledShelfExpanded?: boolean;
+    threadListArchivedShelfExpanded?: boolean;
     threadListSnoozedShelfExpanded?: boolean;
     threadListWorkingShelfExpanded?: boolean;
     threadListFilters?: ThreadListFilters;
@@ -282,6 +284,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
         typeof favorite.model === "string" &&
         favorite.model.trim().length > 0,
     );
+  }
+  if (typeof parsed.threadListArchivedShelfExpanded === "boolean") {
+    preferences.threadListArchivedShelfExpanded = parsed.threadListArchivedShelfExpanded;
   }
   if (typeof parsed.threadListSettledShelfExpanded === "boolean") {
     preferences.threadListSettledShelfExpanded = parsed.threadListSettledShelfExpanded;
