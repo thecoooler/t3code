@@ -173,7 +173,23 @@ Stashes containing uploaded files must be restored in their original environment
 Those files are retained for 24 hours. After an upload expires, restore the prompt
 and use **Attach again** or remove the missing file before sending.
 
-## Voice input on iPhone
+## Voice input
+
+For OpenRouter transcription, enable **Settings → General → Voice input** on web
+or desktop, or **Settings → Microphone → OpenRouter voice input** on mobile. Enter
+your OpenRouter API key and a speech-to-text model ID, such as `openai/whisper-1`.
+Optionally set a two-letter language hint and a temperature between 0 and 1.
+Settings belong to this device or browser profile and do not sync to other devices.
+Web microphone access requires HTTPS or localhost.
+
+Use the composer's microphone to record, pause and resume as needed, then confirm
+to transcribe. The recording indicator shows the active recording time. Cancel
+can discard the recording or abort an in-progress transcription; canceled results
+are never added to your draft. Audio is sent directly to OpenRouter when you
+confirm. Canceling a request cannot undo audio already received by the provider.
+Recordings are limited to five minutes. Review the resulting text before sending.
+
+### Local dictation on iPhone
 
 On supported iPhones with iOS 26 or later, use the composer's microphone to record,
 then confirm to transcribe. Text is inserted where your selection was when
@@ -192,7 +208,7 @@ for example, put **Other Bluetooth** above your AirPods so a new headset is pref
 while the AirPods microphone stays low. By default, CarPlay comes after the built-in
 microphone.
 
-Transcription runs on your device. T3 Code deletes the temporary audio after
+With OpenRouter disabled, transcription runs on your device. T3 Code deletes the temporary audio after
 transcription or cancellation; only the message text is sent when you submit.
 
 ## Queued messages

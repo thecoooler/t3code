@@ -518,6 +518,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     desktopOnly: true,
   },
   {
+    id: "voice-input",
+    title: "Voice input",
+    to: "/settings/general",
+    searchTerms: [
+      "openrouter microphone recording transcription speech audio api key language temperature",
+    ],
+  },
+  {
     id: "text-generation-model",
     title: "Text generation model",
     to: "/settings/general",

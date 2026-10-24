@@ -41,6 +41,7 @@ export function resolveVoiceComposerPresentation(
         statusLabel: "Preparing",
         confirmationEnabled: false,
       };
+    case "paused":
     case "recording": {
       const seconds = Math.max(0, Math.floor(elapsedSeconds));
       return {
@@ -48,7 +49,7 @@ export function resolveVoiceComposerPresentation(
         trailingAction: "confirm",
         showsSend: false,
         statusKind: "active",
-        statusLabel: `Recording ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
+        statusLabel: `${state.phase === "paused" ? "Paused" : "Recording"} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
         confirmationEnabled: true,
       };
     }

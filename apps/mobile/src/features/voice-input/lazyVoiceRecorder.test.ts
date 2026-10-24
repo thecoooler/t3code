@@ -16,16 +16,19 @@ function createNativeRecorder(uri: string) {
       this.uri = this.prepared;
     }),
     record: vi.fn(),
+    pause: vi.fn(),
     stop: vi.fn(async (): Promise<void> => undefined),
     getStatus: vi.fn((): State => ({ isRecording: true })),
     addListener: vi.fn((_event: "recordingStatusUpdate", listener: (status: Status) => void) => {
       listeners.add(listener);
       return { remove: () => listeners.delete(listener) };
     }),
-    getAvailableInputs: vi.fn((): ReadonlyArray<VoiceRecordingInput> => [
-      { uid: "car", name: "CarPlay", type: "CarAudio" },
-      { uid: "built-in", name: "iPhone Microphone", type: "MicrophoneBuiltIn" },
-    ]),
+    getAvailableInputs: vi.fn(
+      (): ReadonlyArray<VoiceRecordingInput> => [
+        { uid: "car", name: "CarPlay", type: "CarAudio" },
+        { uid: "built-in", name: "iPhone Microphone", type: "MicrophoneBuiltIn" },
+      ],
+    ),
     setInput: vi.fn((_uid: string) => undefined),
     release: vi.fn(),
     emit: (status: Status) => listeners.forEach((listener) => listener(status)),
@@ -50,6 +53,18 @@ function createHarness(
 }
 
 describe("createLazyVoiceRecorder", () => {
+  it("resumes paused audio without replacing the original duration limit", async () => {
+    const { recorder, created } = createHarness();
+    await recorder.prepareToRecordAsync();
+    recorder.record({ forDuration: 300 });
+    recorder.pause?.();
+    recorder.resume?.();
+    const native = created[0]!;
+    expect(native.pause).toHaveBeenCalledOnce();
+    expect(native.record.mock.calls).toEqual([[{ forDuration: 300 }], []]);
+    expect(native.prepareToRecordAsync).toHaveBeenCalledOnce();
+  });
+
   it("keeps the system input when none is preferred or the preferred one disconnects", async () => {
     const unpreferred = createHarness(() => null);
     await unpreferred.recorder.prepareToRecordAsync();

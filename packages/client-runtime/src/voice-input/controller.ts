@@ -4,7 +4,13 @@ import type { PreparedVoiceTranscription, VoiceTranscriber } from "./transcripti
 
 export const VOICE_RECORDING_LIMIT_SECONDS = 5 * 60;
 
-export type VoiceInputPhase = "idle" | "preparing" | "recording" | "transcribing" | "error";
+export type VoiceInputPhase =
+  | "idle"
+  | "preparing"
+  | "recording"
+  | "paused"
+  | "transcribing"
+  | "error";
 
 export type VoiceInputState = {
   readonly phase: VoiceInputPhase;
@@ -14,7 +20,10 @@ export type VoiceInputState = {
 
 export function voiceInputBlocksSubmission(state: VoiceInputState): boolean {
   return (
-    state.phase === "preparing" || state.phase === "recording" || state.phase === "transcribing"
+    state.phase === "preparing" ||
+    state.phase === "recording" ||
+    state.phase === "paused" ||
+    state.phase === "transcribing"
   );
 }
 
@@ -36,6 +45,8 @@ export interface VoiceRecorder {
   readonly uri: string | null;
   prepareToRecordAsync(): Promise<void>;
   record(options: { readonly forDuration: number }): void;
+  pause?(): void;
+  resume?(): void;
   stop(): Promise<void>;
 }
 
@@ -167,6 +178,7 @@ function preparationErrorMessage(error: unknown): string {
   if (errorCode(error) === "unsupported-locale") {
     return "Voice transcription is not available for this language.";
   }
+  if (errorCode(error) === "preparation-failed" && error instanceof Error) return error.message;
   return "Could not prepare voice transcription.";
 }
 
@@ -174,6 +186,7 @@ function transcriptionErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message === "voice-operation-busy") {
     return "Voice transcription is still finishing. Try again shortly.";
   }
+  if (errorCode(error) === "transcription-failed" && error instanceof Error) return error.message;
   return "Could not transcribe this recording.";
 }
 
@@ -286,8 +299,22 @@ export class VoiceInputController {
   }
 
   stop(): Promise<void> {
-    if (this.state.phase !== "recording") return Promise.resolve();
+    if (this.state.phase !== "recording" && this.state.phase !== "paused") return Promise.resolve();
     return this.finishRecording(false, null);
+  }
+
+  togglePause(): void {
+    try {
+      if (this.state.phase === "recording" && this.dependencies.recorder.pause) {
+        this.dependencies.recorder.pause();
+        this.setState({ phase: "paused", error: null, errorAction: null });
+      } else if (this.state.phase === "paused" && this.dependencies.recorder.resume) {
+        this.dependencies.recorder.resume();
+        this.setState({ phase: "recording", error: null, errorAction: null });
+      }
+    } catch {
+      void this.interruptRecording("Could not pause or resume voice recording.");
+    }
   }
 
   cancel(): void {
@@ -301,6 +328,7 @@ export class VoiceInputController {
         this.invalidateOperation();
         this.setState(IDLE_STATE);
         return;
+      case "paused":
       case "recording":
         this.discardRecording(null);
         return;
@@ -315,7 +343,7 @@ export class VoiceInputController {
     message = "Voice recording was interrupted.",
     completedUri: string | null = null,
   ): Promise<void> | void {
-    if (this.state.phase !== "recording") return;
+    if (this.state.phase !== "recording" && this.state.phase !== "paused") return;
     this.rememberRecordingUri(completedUri);
     this.recordingUri = completedUri ?? this.recordingUri;
     return this.discardRecording(message);
@@ -331,7 +359,7 @@ export class VoiceInputController {
   }
 
   handleRecorderStatus(status: VoiceRecorderStatus): Promise<void> | void {
-    if (this.state.phase !== "recording") return;
+    if (this.state.phase !== "recording" && this.state.phase !== "paused") return;
     if (status.hasError) {
       return this.interruptRecording(
         status.error ?? "Voice recording was interrupted.",
@@ -352,7 +380,7 @@ export class VoiceInputController {
   }
 
   dispose(): void {
-    if (this.state.phase === "recording") {
+    if (this.state.phase === "recording" || this.state.phase === "paused") {
       this.discardRecording(null);
       return;
     }
@@ -366,7 +394,8 @@ export class VoiceInputController {
     alreadyStopped: boolean,
     completedUri: string | null,
   ): Promise<void> {
-    if (this.finishing || this.state.phase !== "recording") return;
+    if (this.finishing || (this.state.phase !== "recording" && this.state.phase !== "paused"))
+      return;
     this.finishing = true;
     const operationToken = this.operationToken;
     this.setState({ phase: "transcribing", error: null, errorAction: null });

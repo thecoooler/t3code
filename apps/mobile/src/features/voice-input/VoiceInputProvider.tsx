@@ -1,3 +1,4 @@
+import { readOpenRouterVoiceSettings, useOpenRouterVoiceSettings } from "./openRouterSettings";
 import { RegistryContext, useAtomMount } from "@effect/atom-react";
 import {
   AudioModule,
@@ -33,6 +34,7 @@ import { getLocalVoiceTranscriber } from "../../native/voiceTranscription";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { getNativeShowcaseScene } from "../showcase/nativeShowcaseScene";
 import {
+  createOpenRouterVoiceTranscriber,
   VOICE_RECORDING_LIMIT_SECONDS,
   voiceInputBlocksSubmission,
   type VoiceInputState,
@@ -153,7 +155,16 @@ function useVoiceInputRuntime() {
     recorderRef.current = recorder;
     sessionRef.current = new VoiceInputSession({
       recorder,
-      getTranscriber: getLocalVoiceTranscriber,
+      getTranscriber: () => {
+        const settings = readOpenRouterVoiceSettings();
+        return settings.enabled
+          ? createOpenRouterVoiceTranscriber(settings, async (uri, signal) => {
+              if (signal.aborted) throw new Error("Cancelled");
+              const data = await new File(uri).base64();
+              return { data, format: "m4a" };
+            })
+          : getLocalVoiceTranscriber();
+      },
       requestPermission: async () => {
         const permission = await requestRecordingPermissionsAsync();
         return { granted: permission.granted, canAskAgain: permission.canAskAgain };
@@ -211,7 +222,7 @@ function useVoiceInputRuntime() {
       audioLevelsRef.current = Array<number>(VOICE_WAVEFORM_SAMPLE_COUNT).fill(0);
       audioLevels.value = audioLevelsRef.current;
     }
-    if (elapsedSecondsRef.current !== 0) {
+    if (state.phase === "preparing" && elapsedSecondsRef.current !== 0) {
       elapsedSecondsRef.current = 0;
       setElapsedSeconds(0);
     }
@@ -245,11 +256,16 @@ function useVoiceInputRuntime() {
     return () => clearInterval(intervalId);
   }, [audioLevels, controller, recorder, state.phase]);
 
+  const { settings: openRouterSettings } = useOpenRouterVoiceSettings();
+  const togglePause = useCallback(() => controller.togglePause(), [controller]);
   const stop = useCallback(() => controller.stop(), [controller]);
   const cancel = useCallback(() => controller.cancel(), [controller]);
 
   return {
-    isAvailable: getLocalVoiceTranscriber() !== null || getNativeShowcaseScene() !== null,
+    isAvailable:
+      openRouterSettings.enabled ||
+      getLocalVoiceTranscriber() !== null ||
+      getNativeShowcaseScene() !== null,
     state,
     audioLevels,
     elapsedSeconds,
@@ -260,6 +276,7 @@ function useVoiceInputRuntime() {
     setOwnerFocused,
     session,
     stop,
+    togglePause,
     cancel,
   };
 }

@@ -73,6 +73,7 @@ export function useVoiceInputController(input: {
     blocksSubmission: isBusy,
     start,
     stop: global.stop,
+    togglePause: global.togglePause,
     cancel: global.cancel,
   };
 }
