@@ -98,7 +98,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
    * Compact UI geometry. Keep these values semantic so sidebar, palette,
    * tooltip, and toolbar controls cannot quietly drift apart.
    */
-  --control-radius: 0.5rem;
+  --control-radius: calc(0.5rem * var(--radius-scale));
   --sidebar-content-inset: 0.5rem;
   --sidebar-control-gap: 0.5rem;
   --sidebar-icon-color: color-mix(
@@ -278,12 +278,15 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-sidebar-row-active: var(--sidebar-row-active);
   --color-sidebar-row-selected: var(--sidebar-row-selected);
   --color-sidebar-border: var(--contrast-sidebar-border);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  /* Offsets are applied before the Settings -> Appearance corner radius scale
+     so every step shrinks to square together instead of going negative. */
+  --radius-xs: calc(0.125rem * var(--radius-scale));
+  --radius-sm: calc((var(--radius-base) - 4px) * var(--radius-scale));
+  --radius-md: calc((var(--radius-base) - 2px) * var(--radius-scale));
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-xl: calc((var(--radius-base) + 4px) * var(--radius-scale));
+  --radius-2xl: calc((var(--radius-base) + 8px) * var(--radius-scale));
+  --radius-3xl: calc((var(--radius-base) + 12px) * var(--radius-scale));
   @keyframes skeleton {
     /* The single loading-bar breath used by every skeleton: one opacity pulse
        per container, stepped so however many bars sit under it, the compositor
@@ -1090,7 +1093,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
 :root {
   color-scheme: light;
-  --radius: 0.625rem;
+  --radius-scale: 1;
+  --radius-base: 0.625rem;
+  --radius: calc(var(--radius-base) * var(--radius-scale));
   --background: var(--color-zinc-25);
   --app-chrome-background: var(--background);
   --toolbar-background: var(--app-chrome-background);

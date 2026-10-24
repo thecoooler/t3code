@@ -103,6 +103,14 @@ export const GlassOpacity = Schema.Int.check(
 export type GlassOpacity = typeof GlassOpacity.Type;
 const DEFAULT_GLASS_OPACITY: GlassOpacity = 80;
 
+export const MIN_CORNER_RADIUS = 0;
+export const MAX_CORNER_RADIUS = 200;
+export const CornerRadius = Schema.Int.check(
+  Schema.isBetween({ minimum: MIN_CORNER_RADIUS, maximum: MAX_CORNER_RADIUS }),
+);
+export type CornerRadius = typeof CornerRadius.Type;
+const DEFAULT_CORNER_RADIUS: CornerRadius = 100;
+
 export const MIN_APPEARANCE_CONTRAST = 50;
 export const MAX_APPEARANCE_CONTRAST = 200;
 export const AppearanceContrast = Schema.Int.check(
@@ -394,6 +402,9 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   glassOpacity: GlassOpacity.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_GLASS_OPACITY)),
+  ),
+  cornerRadius: CornerRadius.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_CORNER_RADIUS)),
   ),
   fontSizeInterface: InterfaceFontSize.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_INTERFACE_FONT_SIZE)),
@@ -1711,6 +1722,7 @@ export const ClientSettingsPatch = Schema.Struct({
   diffLayout: Schema.optionalKey(DiffLayout),
   environmentIdentificationMode: Schema.optionalKey(EnvironmentIdentificationMode),
   glassOpacity: Schema.optionalKey(GlassOpacity),
+  cornerRadius: Schema.optionalKey(CornerRadius),
   onboardingCompletedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   fontSizeInterface: Schema.optionalKey(InterfaceFontSize),
   fontSizePrompt: Schema.optionalKey(PromptFontSize),
