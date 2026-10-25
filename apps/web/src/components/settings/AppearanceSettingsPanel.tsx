@@ -6,9 +6,11 @@ import {
   type ChatWidth,
   type EnvironmentIdentificationMode,
   MAX_APPEARANCE_CONTRAST,
+  MAX_CORNER_RADIUS,
   MAX_GLASS_OPACITY,
   MAX_PANEL_ANIMATION_DURATION_MS,
   MIN_APPEARANCE_CONTRAST,
+  MIN_CORNER_RADIUS,
   MIN_GLASS_OPACITY,
   MIN_PANEL_ANIMATION_DURATION_MS,
 } from "@t3tools/contracts/settings";
@@ -74,6 +76,12 @@ export function AppearanceSettingsPanel() {
   const appearanceContrastSliderStyle = {
     "--settings-slider-progress": `${appearanceContrastRatio * 100}%`,
     "--settings-slider-fill-offset": `${0.5 - appearanceContrastRatio}rem`,
+  } as CSSProperties;
+  const cornerRadiusRatio =
+    (settings.cornerRadius - MIN_CORNER_RADIUS) / (MAX_CORNER_RADIUS - MIN_CORNER_RADIUS);
+  const cornerRadiusSliderStyle = {
+    "--settings-slider-progress": `${cornerRadiusRatio * 100}%`,
+    "--settings-slider-fill-offset": `${0.5 - cornerRadiusRatio}rem`,
   } as CSSProperties;
   const panelAnimationDurationRatio =
     (settings.panelAnimationDurationMs - MIN_PANEL_ANIMATION_DURATION_MS) /
@@ -193,6 +201,52 @@ export function AppearanceSettingsPanel() {
                 style={glassOpacitySliderStyle}
                 type="range"
                 value={settings.glassOpacity}
+              />
+            </div>
+          }
+        />
+
+        <SettingsRow
+          {...searchableSetting("setting-corner-radius")}
+          description="Make corners of buttons, inputs, menus, and cards rounder or squarer."
+          resetAction={
+            settings.cornerRadius !== DEFAULT_UNIFIED_SETTINGS.cornerRadius ? (
+              <SettingResetButton
+                label="corner radius"
+                onClick={() =>
+                  updateSettings({ cornerRadius: DEFAULT_UNIFIED_SETTINGS.cornerRadius })
+                }
+              />
+            ) : null
+          }
+          control={
+            <div className="flex w-full items-center gap-3 sm:w-52">
+              <output
+                className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                htmlFor="corner-radius"
+              >
+                {settings.cornerRadius}%
+              </output>
+              <input
+                aria-label="Corner radius"
+                className="settings-slider min-w-0 flex-1"
+                id="corner-radius"
+                max={MAX_CORNER_RADIUS}
+                min={MIN_CORNER_RADIUS}
+                onChange={(event) => {
+                  const cornerRadius = Number(event.currentTarget.value);
+                  if (
+                    Number.isInteger(cornerRadius) &&
+                    cornerRadius >= MIN_CORNER_RADIUS &&
+                    cornerRadius <= MAX_CORNER_RADIUS
+                  ) {
+                    updateSettings({ cornerRadius });
+                  }
+                }}
+                step={10}
+                style={cornerRadiusSliderStyle}
+                type="range"
+                value={settings.cornerRadius}
               />
             </div>
           }
