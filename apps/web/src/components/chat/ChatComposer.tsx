@@ -1,3 +1,5 @@
+import { useVoiceInput } from "../../voice-input/useVoiceInput";
+import { VoiceInputControl } from "../../voice-input/VoiceInputControl";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
 import { insertAttachmentReferencesForDraft } from "./composerAttachmentReferences";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
@@ -1323,6 +1325,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     setComposerDraftPrompt(composerDraftTarget, nextPrompt);
   };
 
+  const voiceInput = useVoiceInput({
+    ownerKey: composerDraftTargetKey,
+    disabled: pendingUserInputs.length > 0,
+    readCursor: () => readComposerSnapshot().expandedCursor,
+    readText: () => getComposerDraft(composerDraftTarget)?.prompt ?? "",
+    commitText: (text, cursor) => {
+      promptRef.current = text;
+      setPrompt(text);
+      setComposerCursor(collapseExpandedComposerCursor(text, cursor, false));
+    },
+  });
+
   const addComposerImage = (image: ComposerImageAttachment) =>
     addComposerDraftImages(attachmentDraftTarget, [image]);
 
@@ -2104,6 +2118,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     submissionIntent?: ComposerSubmissionIntent,
   ) => {
     if (
+      voiceInput.isBusy ||
       noProviderAvailable ||
       isSendDisabled ||
       !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)
@@ -3620,11 +3635,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     (showProviderUnavailable ? "Enable a provider in Settings" : "Ask anything...")}
                 </button>
                 {collapsedComposerImagePreviews}
+                {voiceInput.isBusy || voiceInput.state.error ? (
+                  <VoiceInputControl voice={voiceInput} disabled={!canOperateThread} />
+                ) : null}
                 <button
                   type="button"
                   data-chat-composer-transition-actions="true"
                   className="flex size-8 shrink-0 items-center justify-center rounded-full bg-message-action text-message-action-foreground hover:bg-message-action-hover disabled:opacity-64"
-                  disabled={collapsedComposerPrimaryActionDisabled}
+                  disabled={collapsedComposerPrimaryActionDisabled || voiceInput.isBusy}
                   aria-label={collapsedComposerPrimaryActionLabel}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={(event) => {
@@ -3798,6 +3816,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   : "Ask anything, @tag files/folders, $use skills, or / for commands"
                     }
                     disabled={
+                      voiceInput.isBusy ||
                       isConnecting ||
                       projectSelectionRequired ||
                       isChoiceOnlyPendingQuestion ||
@@ -3879,6 +3898,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   }
                   className="flex shrink-0 flex-nowrap items-center justify-end gap-2"
                 >
+                  <VoiceInputControl
+                    voice={voiceInput}
+                    disabled={
+                      !canOperateThread ||
+                      pendingUserInputs.length > 0 ||
+                      isConnecting ||
+                      projectSelectionRequired
+                    }
+                  />
                   {composerAttachButton}
                   <ComposerFooterPrimaryActions
                     compact={isComposerResting || isComposerPrimaryActionsCompact}
@@ -3913,7 +3941,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     }
                     promptHasText={prompt.trim().length > 0}
                     isSendBusy={isSendBusy}
-                    sendDisabledReason={sendDisabledReason}
+                    sendDisabledReason={
+                      voiceInput.isBusy ? "Finish or cancel voice input first." : sendDisabledReason
+                    }
                     isConnecting={isConnecting}
                     isEnvironmentUnavailable={
                       environmentUnavailable !== null ||

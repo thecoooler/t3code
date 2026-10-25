@@ -1,3 +1,4 @@
+import { useGlobalVoiceInput } from "./VoiceInputProvider";
 import type { VoiceInputPhase, VoiceInputState } from "@t3tools/client-runtime/voice-input";
 import { memo, useCallback, useLayoutEffect, useState, type ReactNode } from "react";
 import { Linking, Pressable, Text as SystemText, View, type LayoutChangeEvent } from "react-native";
@@ -320,6 +321,7 @@ export function ComposerDictationStatus(props: {
   readonly presentation: VoiceComposerPresentation;
   readonly onDismissError: () => void;
 }) {
+  const voice = useGlobalVoiceInput();
   const recordingVisibility = useSharedValue(props.phase === "recording" ? 1 : 0);
   useLayoutEffect(() => {
     recordingVisibility.value = withTiming(props.phase === "recording" ? 1 : 0, DICTATION_TIMING);
@@ -334,51 +336,67 @@ export function ComposerDictationStatus(props: {
   if (!props.presentation.statusLabel) return null;
   const isError = props.presentation.statusKind === "error";
   return (
-    <View className="relative h-11 min-w-0 flex-1 justify-center">
-      {isError ? (
-        <View className="min-w-0 flex-row items-center gap-1.5 px-2">
-          <Text className="min-w-0 flex-1 text-sm text-danger-foreground" numberOfLines={2}>
-            {props.presentation.statusLabel}
-          </Text>
-          <Pressable
-            accessibilityLabel="Dismiss voice input error"
-            accessibilityRole="button"
-            className="size-7 items-center justify-center active:opacity-70"
-            hitSlop={8}
-            onPress={props.onDismissError}
-          >
-            <SymbolView
-              name="xmark"
-              size={12}
-              tintColorClassName="accent-icon-muted"
-              type="monochrome"
-            />
-          </Pressable>
-        </View>
-      ) : (
-        <View
-          accessible
-          accessibilityLabel={props.presentation.statusLabel}
-          accessibilityLiveRegion={props.phase === "recording" ? "none" : "polite"}
-          className="h-11"
+    <View className="h-11 min-w-0 flex-1 flex-row items-center">
+      {props.phase === "recording" || props.phase === "paused" ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={props.phase === "paused" ? "Resume recording" : "Pause recording"}
+          onPress={voice.togglePause}
+          className="size-11 items-center justify-center"
         >
-          <Animated.View
-            className="absolute inset-0 min-w-0 flex-row items-center gap-2 px-1"
-            style={waveformStyle}
-          >
-            <VoiceWaveform audioLevels={props.audioLevels} />
-            <DictationElapsedTime
-              className="text-foreground-muted"
-              seconds={props.elapsedSeconds}
-            />
-          </Animated.View>
-          <Animated.View className="absolute inset-0 justify-center px-2" style={labelStyle}>
-            <Text className="text-center text-sm text-foreground-muted" numberOfLines={1}>
+          <SymbolView
+            name={props.phase === "paused" ? "play.fill" : "pause.fill"}
+            size={18}
+            tintColorClassName="accent-icon"
+          />
+        </Pressable>
+      ) : null}
+      <View className="relative h-11 min-w-0 flex-1 justify-center">
+        {isError ? (
+          <View className="min-w-0 flex-row items-center gap-1.5 px-2">
+            <Text className="min-w-0 flex-1 text-sm text-danger-foreground" numberOfLines={2}>
               {props.presentation.statusLabel}
             </Text>
-          </Animated.View>
-        </View>
-      )}
+            <Pressable
+              accessibilityLabel="Dismiss voice input error"
+              accessibilityRole="button"
+              className="size-7 items-center justify-center active:opacity-70"
+              hitSlop={8}
+              onPress={props.onDismissError}
+            >
+              <SymbolView
+                name="xmark"
+                size={12}
+                tintColorClassName="accent-icon-muted"
+                type="monochrome"
+              />
+            </Pressable>
+          </View>
+        ) : (
+          <View
+            accessible
+            accessibilityLabel={props.presentation.statusLabel}
+            accessibilityLiveRegion={props.phase === "recording" ? "none" : "polite"}
+            className="h-11"
+          >
+            <Animated.View
+              className="absolute inset-0 min-w-0 flex-row items-center gap-2 px-1"
+              style={waveformStyle}
+            >
+              <VoiceWaveform audioLevels={props.audioLevels} />
+              <DictationElapsedTime
+                className="text-foreground-muted"
+                seconds={props.elapsedSeconds}
+              />
+            </Animated.View>
+            <Animated.View className="absolute inset-0 justify-center px-2" style={labelStyle}>
+              <Text className="text-center text-sm text-foreground-muted" numberOfLines={1}>
+                {props.presentation.statusLabel}
+              </Text>
+            </Animated.View>
+          </View>
+        )}
+      </View>
     </View>
   );
 }

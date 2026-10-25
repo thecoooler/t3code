@@ -1,3 +1,4 @@
+import { OpenRouterVoiceSettingsSection } from "../voice-input/OpenRouterVoiceSettings";
 import { Button } from "../../components/ui/Button";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
@@ -145,6 +146,7 @@ export function SettingsMicrophoneRouteScreen() {
         contentContainerClassName="gap-3 px-5 pt-4"
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
+        <OpenRouterVoiceSettingsSection />
         {permission === "ask" || permission === "denied" ? (
           <>
             <SettingsSection title="Microphone access">
