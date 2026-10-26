@@ -20,6 +20,9 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as HttpClient from "effect/http/HttpClient";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { AcpRegistryAdapterV2Driver, type AcpRegistryAdapterV2DriverEnv } from "./adapter.ts";
@@ -56,6 +59,10 @@ import * as AcpRegistrySupport from "./AcpRegistrySupport.ts";
 import * as AcpRegistryRuntimeCoordinator from "./AcpRegistryRuntimeCoordinator.ts";
 import * as AcpRegistryAuth from "./auth.ts";
 import * as AcpRegistryAuthenticationState from "./authenticationState.ts";
+import {
+  readCommandCodeUsageLimits,
+  usesCommandCodeUsageLimits,
+} from "./commandCodeUsageLimits.ts";
 
 const DRIVER_KIND = ProviderDriverKind.make("acpRegistry");
 const decodeSettings = Schema.decodeSync(AcpRegistrySettings);
@@ -445,7 +452,10 @@ export const checkAcpRegistryProviderReadiness = Effect.fn(
     : snapshot;
 });
 
-export type AcpRegistryDriverEnv = AcpRegistryAdapterV2DriverEnv | ProviderHost.ProviderHost;
+export type AcpRegistryDriverEnv =
+  | AcpRegistryAdapterV2DriverEnv
+  | ProviderHost.ProviderHost
+  | HttpClient.HttpClient;
 
 export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryDriverEnv> = {
   driverKind: DRIVER_KIND,
@@ -495,6 +505,20 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
     const processEnvironment = yield* mergeProviderInstanceEnvironment(
       environment,
       hostEnvironment,
+    );
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const client = yield* HttpClient.HttpClient;
+    const home = yield* HostProcess.HomeDirectory;
+    const readUsageLimits = readCommandCodeUsageLimits({
+      environment: processEnvironment,
+      args: effectiveConfig.commandArgs,
+    }).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.provideService(Path.Path, path),
+      Effect.provideService(HttpClient.HttpClient, client),
+      Effect.provideService(Crypto.Crypto, crypto),
+      Effect.provideService(HostProcess.HomeDirectory, home),
     );
     const orchestrationAdapter = yield* AcpRegistryAdapterV2Driver.create({
       instanceId,
@@ -563,6 +587,11 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
     const checkProvider = checkAcpRegistryProviderReadiness(readinessInput).pipe(
       Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, catalog),
       Effect.flatMap(withLiveRuntimeState),
+      Effect.flatMap((provider) =>
+        provider.enabled && provider.installed && usesCommandCodeUsageLimits(effectiveConfig)
+          ? readUsageLimits.pipe(Effect.map((usageLimits) => ({ ...provider, usageLimits })))
+          : Effect.succeed(provider),
+      ),
     );
     const enrichProvider = checkAcpRegistryProviderStatus(
       {

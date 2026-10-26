@@ -54,6 +54,22 @@ export const AcpRegistrySettings = makeProviderSettingsSchema(
         providerSettingsForm: { placeholder: "auto", clearWhenEmpty: "omit" },
       }),
     ),
+    usageLimitsSource: Schema.Literals(["auto", "commandCode", "none"]).pipe(
+      Schema.withDecodingDefault(Effect.succeed("auto")),
+      Schema.annotateKey({
+        title: "Usage limits",
+        description:
+          "Account to query for usage limits. Select Command Code when using a wrapper command.",
+        providerSettingsForm: {
+          control: "select",
+          options: [
+            { value: "auto", label: "Automatic" },
+            { value: "commandCode", label: "Command Code" },
+            { value: "none", label: "Disabled" },
+          ],
+        },
+      }),
+    ),
     distribution: AcpRegistryDistributionPreference.pipe(
       Schema.withDecodingDefault(Effect.succeed("auto")),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
@@ -64,7 +80,7 @@ export const AcpRegistrySettings = makeProviderSettingsSchema(
     ),
   },
   {
-    order: ["source", "agentId", "commandPath", "authMethodId"],
+    order: ["source", "agentId", "commandPath", "authMethodId", "usageLimitsSource"],
   },
 );
 export type AcpRegistrySettings = typeof AcpRegistrySettings.Type;
