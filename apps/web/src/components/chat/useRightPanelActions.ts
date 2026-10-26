@@ -31,6 +31,7 @@ import { openDeviceSetupDialog } from "./ChatOverlayHosts";
 import { previewEnvironment } from "../../state/preview";
 import { useAtomCommand } from "../../state/use-atom-command";
 import type { ChatShortcutCommands } from "./useChatShortcuts";
+import type { ThreadView } from "./ThreadViewBar";
 interface RightPanelActionsInput {
   readonly activeThreadRef: ScopedThreadRef | null;
   readonly activeProject: EnvironmentProject | null;
@@ -48,6 +49,8 @@ interface RightPanelActionsInput {
   readonly rightPanelOpen: boolean;
   readonly canMaximizeRightPanel: boolean;
   readonly rightPanelMaximized: boolean;
+  /** The panel is a sheet over the thread on narrow layouts, which cannot be maximized. */
+  readonly rightPanelSheet: boolean;
   readonly supportsPullRequests: boolean;
   readonly pullRequestsSurfaceAvailable: boolean;
   readonly gitCwd: string | null;
@@ -81,6 +84,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     rightPanelOpen,
     canMaximizeRightPanel,
     rightPanelMaximized,
+    rightPanelSheet,
     supportsPullRequests,
     pullRequestsSurfaceAvailable,
     gitCwd,
@@ -275,6 +279,27 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     useRightPanelStore.getState().openPullRequest(activeThreadRef, pullRequestPanelTarget);
   };
   const addPullRequestSurfaceStable = useStableCallback(addPullRequestSurface);
+  const showThreadView = (view: ThreadView) => {
+    if (!activeThreadRef) return;
+    if (view === "thread") {
+      if (rightPanelOpen && (rightPanelMaximized || rightPanelSheet)) closePreviewPanel();
+      return;
+    }
+    if (view === "pull-request") {
+      if (!supportsPullRequests || pullRequestPanelTarget === null) return;
+      useRightPanelStore.getState().openPullRequest(activeThreadRef, pullRequestPanelTarget);
+    } else if (view === "files") {
+      if (!activeProject) return;
+      useRightPanelStore.getState().open(activeThreadRef, "files");
+    } else {
+      if (!isServerThread || !isGitRepo) return;
+      useDiffPanelStore.getState().selectGitScope(activeThreadRef, "unstaged");
+      useRightPanelStore.getState().open(activeThreadRef, "diff");
+      onDiffPanelOpen?.();
+    }
+    if (!rightPanelSheet) useRightPanelStore.getState().setMaximized(activeThreadRef, true);
+  };
+  const showThreadViewStable = useStableCallback(showThreadView);
   const onOpenTurnDiff = (runId: RunId, filePath?: string) => {
     if (!isServerThread || !activeThreadRef) return;
     const diffOpen =
@@ -323,6 +348,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     onToggleDiffStable,
     openChangesFromThreadPanelStable,
     openFileSurfaceStable,
+    showThreadViewStable,
     toggleRightPanelMaximizedStable,
     toggleRightPanelStable,
     toggleThreadPanelStable,
