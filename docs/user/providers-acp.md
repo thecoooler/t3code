@@ -76,6 +76,14 @@ If an agent cannot complete its advertised flow remotely, its CLI remains availa
 server. For example, Codex supports `codex login --device-auth`, and Grok Build supports
 `grok login --device-auth`.
 
+## Usage limits
+
+Command Code account limits appear in **Usage → Limits** automatically, including its five-hour
+and weekly allowances. Sign in to Command Code on the environment where it runs. If you launch it
+through a wrapper, select **Usage limits → Command Code** in the provider's settings. Select
+**Disabled** to turn off account limit checks. These allowances belong to your Command Code account;
+they do not describe limits for models connected with your own API keys.
+
 ## Models and options
 
 The model picker lists the models the agent reports. If the agent reports none, or hides some, add

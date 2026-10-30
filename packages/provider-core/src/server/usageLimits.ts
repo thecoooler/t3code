@@ -104,6 +104,12 @@ export function resolveUsageLimitsAfterProbe(input: {
   readonly probed: ServerProviderUsageLimits | undefined;
 }): ServerProviderUsageLimits | undefined {
   const { published, probed } = input;
+  if (
+    probed?.credentialFingerprint !== undefined &&
+    published?.credentialFingerprint !== probed.credentialFingerprint
+  ) {
+    return probed;
+  }
   if (probed?.unavailable?.reason === "probeFailed" && published && !published.unavailable) {
     return published;
   }

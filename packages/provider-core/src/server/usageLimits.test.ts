@@ -119,4 +119,22 @@ describe("resolveUsageLimitsAfterProbe", () => {
     expect(resolveUsageLimitsAfterProbe({ published, probed: unsupported })).toBe(unsupported);
     expect(resolveUsageLimitsAfterProbe({ published: undefined, probed: failed })).toBe(failed);
   });
+
+  it("does not retain windows from a different credential after a failed or older probe", () => {
+    const previous = { ...published, credentialFingerprint: "account-a" };
+    const next = {
+      checkedAt: "2026-09-01T00:00:00.000Z",
+      windows: [],
+      credentialFingerprint: "account-b",
+    };
+    const failed = { ...next, unavailable: { reason: "probeFailed" as const } };
+    expect(resolveUsageLimitsAfterProbe({ published: previous, probed: failed })).toBe(failed);
+    expect(resolveUsageLimitsAfterProbe({ published: previous, probed: next })).toBe(next);
+    expect(
+      resolveUsageLimitsAfterProbe({
+        published: previous,
+        probed: { ...failed, credentialFingerprint: "account-a" },
+      }),
+    ).toBe(previous);
+  });
 });
