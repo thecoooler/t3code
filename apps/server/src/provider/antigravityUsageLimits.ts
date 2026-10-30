@@ -279,11 +279,30 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
     const summary = yield* fetchWindows("retrieveUserQuotaSummary", (response) =>
       decodeSummary(response).pipe(Effect.map(summaryWindows)),
     );
-    const windows = summary.length
-      ? summary
-      : yield* fetchWindows("fetchAvailableModels", (response) =>
-          decodeModels(response).pipe(Effect.map(modelWindows)),
-        );
+    const hasGemini = summary.some((window) => window.id.startsWith("gemini-"));
+    const has3p = summary.some((window) => window.id.startsWith("3p-"));
+    let windows = summary;
+    if (!hasGemini || !has3p) {
+      const models = yield* fetchWindows("fetchAvailableModels", (response) =>
+        decodeModels(response).pipe(Effect.map(modelWindows)),
+      );
+      if (summary.length === 0) {
+        windows = models;
+      } else {
+        const extra = models.filter((window) => {
+          if (window.id.startsWith("gemini-")) return !hasGemini;
+          if (
+            window.id.startsWith("3p-") ||
+            window.id.startsWith("claude-") ||
+            window.id.startsWith("gpt-")
+          ) {
+            return !has3p;
+          }
+          return !summary.some((existing) => existing.id === window.id);
+        });
+        windows = [...summary, ...extra];
+      }
+    }
     if (windows.length === 0) {
       return makeUnavailableUsageLimits({
         checkedAt,

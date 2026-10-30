@@ -149,6 +149,9 @@ describe("Antigravity subscription limits", () => {
       expect(
         requests.filter((request) => request.url.endsWith(":retrieveUserQuotaSummary")),
       ).toHaveLength(4);
+      expect(
+        requests.filter((request) => request.url.endsWith(":fetchAvailableModels")),
+      ).toHaveLength(0);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
@@ -182,6 +185,76 @@ describe("Antigravity subscription limits", () => {
       expect(byId.get("3p-5h")?.usedPercent).toBeCloseTo(70);
       expect(byId.get("3p-weekly")?.usedPercent).toBe(100);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "supplements missing Gemini limits from available models when quota summary only reports Claude and GPT",
+    () =>
+      Effect.gen(function* () {
+        const { probe, requests } = yield* fixture({
+          summary: {
+            groups: [
+              {
+                displayName: "Claude and GPT models",
+                buckets: [
+                  {
+                    bucketId: "3p-weekly",
+                    window: "weekly",
+                    remainingFraction: 0.25,
+                    resetTime: "2026-10-10T15:28:22Z",
+                  },
+                  {
+                    bucketId: "3p-5h",
+                    window: "5h",
+                    remainingFraction: 0.6,
+                    resetTime: "2026-10-09T16:06:30Z",
+                  },
+                ],
+              },
+            ],
+          },
+          models: {
+            models: {
+              "gemini-2.5-pro": {
+                modelProvider: "MODEL_PROVIDER_GOOGLE",
+                quotaInfo: { remainingFraction: 0.8, resetTime: "2026-10-09T18:00:00Z" },
+                weeklyQuotaInfo: { remainingFraction: 0.95, resetTime: "2026-10-16T18:00:00Z" },
+              },
+              "gemini-2.5-flash": {
+                modelProvider: "MODEL_PROVIDER_GOOGLE",
+                quotaInfo: { remainingFraction: 0.7, resetTime: "2026-10-09T18:00:00Z" },
+              },
+              "claude-sonnet-4": {
+                modelProvider: "MODEL_PROVIDER_ANTHROPIC",
+                quotaInfo: { remainingFraction: 0.1 },
+              },
+            },
+          },
+        });
+        const limits = yield* probe;
+        expect(limits.unavailable).toBeUndefined();
+        expect(limits.windows.map((window) => window.id).toSorted()).toEqual([
+          "3p-5h",
+          "3p-weekly",
+          "gemini-quota",
+          "gemini-weekly",
+        ]);
+        const byId = new Map(limits.windows.map((window) => [window.id, window]));
+        expect(byId.get("3p-weekly")?.usedPercent).toBe(75);
+        expect(byId.get("3p-5h")?.usedPercent).toBe(40);
+        // The most-used reading among Gemini models wins for gemini-quota (1 - 0.7 = 0.3)
+        expect(byId.get("gemini-quota")?.usedPercent).toBeCloseTo(30);
+        expect(byId.get("gemini-weekly")?.usedPercent).toBeCloseTo(5);
+        // Shared 3p bucket takes precedence; individual Claude/GPT model quotas are excluded
+        expect(byId.has("claude-quota")).toBe(false);
+        // Both retrieveUserQuotaSummary and fetchAvailableModels were called across endpoints
+        expect(
+          requests.filter((request) => request.url.endsWith(":retrieveUserQuotaSummary")),
+        ).toHaveLength(2);
+        expect(
+          requests.filter((request) => request.url.endsWith(":fetchAvailableModels")),
+        ).toHaveLength(2);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
   it.effect("keeps one endpoint's quotas when the other fails", () =>
