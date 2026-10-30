@@ -8,6 +8,7 @@ import type {
   EnvironmentId,
   ProjectId,
   ProviderDriverKind,
+  ProviderInstanceId,
   PullRequestListInput,
   ServerProvider,
   ThreadId,
@@ -23,6 +24,9 @@ import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 import type { ComposerTrigger } from "../../composer-logic";
 import type { DraftId } from "../../composerDraftStore";
 import { basenameOfPath } from "../../pierre-icons";
+import type { AppModelOption } from "../../modelSelection";
+import type { ProviderInstanceEntry } from "../../providerInstances";
+import { rankModelPickerSearch } from "./modelPickerSearch";
 import {
   getProviderSkillsForSlashMenu,
   getProviderSlashCommandsForSlashMenu,
@@ -70,6 +74,8 @@ export function useComposerMenuItems({
   selectedProviderSlashCommands,
   showSkillsInSlashMenu,
   questionAttachmentTarget,
+  providerInstanceEntries,
+  modelOptionsByInstance,
 }: {
   readonly composerTrigger: ComposerTrigger | null;
   readonly environmentId: EnvironmentId;
@@ -86,6 +92,10 @@ export function useComposerMenuItems({
   readonly selectedProviderSlashCommands: ServerProvider["slashCommands"];
   readonly showSkillsInSlashMenu: boolean;
   readonly questionAttachmentTarget: DraftId | null;
+  readonly providerInstanceEntries?: ReadonlyArray<ProviderInstanceEntry> | undefined;
+  readonly modelOptionsByInstance?:
+    | ReadonlyMap<ProviderInstanceId, ReadonlyArray<AppModelOption>>
+    | undefined;
 }) {
   // Thread mentions rank by recency as of when the composer mounted.
   const [now] = useState(() => Date.now());
@@ -181,6 +191,75 @@ export function useComposerMenuItems({
   const items = ((): ComposerCommandItem[] => {
     if (!composerTrigger) return [];
     if (composerTrigger.kind === "path") {
+      const query = composerTrigger.query.trim();
+
+      const candidateModels: Array<{
+        entry: ProviderInstanceEntry;
+        model: AppModelOption;
+      }> = [];
+      const candidateProviders: Array<{
+        entry: ProviderInstanceEntry;
+      }> = [];
+
+      for (const entry of providerInstanceEntries ?? []) {
+        candidateProviders.push({ entry });
+        const options = modelOptionsByInstance?.get(entry.instanceId) ?? [];
+        for (const model of options) {
+          candidateModels.push({ entry, model });
+        }
+      }
+
+      const rankedModels =
+        query.length > 0
+          ? rankModelPickerSearch(candidateModels, query, (item) => ({
+              driverKind: item.entry.driverKind,
+              providerDisplayName: item.entry.displayName,
+              name: item.model.name,
+              shortName: item.model.shortName,
+              subProvider: item.model.subProvider,
+            })).slice(0, 10)
+          : candidateModels.filter((item) => item.model.isDefault).slice(0, 5);
+
+      const rankedProviders =
+        query.length > 0
+          ? rankModelPickerSearch(candidateProviders, query, (item) => ({
+              driverKind: item.entry.driverKind,
+              providerDisplayName: item.entry.displayName,
+              name: item.entry.displayName,
+              shortName: item.entry.driverKind,
+            })).slice(0, 4)
+          : [];
+
+      const modelCommandItems: ComposerCommandItem[] = rankedModels.map((item) => ({
+        id: `model:${item.entry.instanceId}:${item.model.slug}`,
+        type: "model" as const,
+        instanceId: item.entry.instanceId,
+        driverKind: item.entry.driverKind,
+        instanceDisplayName: item.entry.displayName,
+        model: item.model.slug,
+        modelName: item.model.name,
+        accentColor: item.entry.accentColor,
+        iconUrl: item.entry.iconUrl,
+        agentId: item.entry.agentId,
+        label: item.model.name,
+        description: `${item.entry.displayName}${item.model.subProvider ? ` • ${item.model.subProvider}` : ""}`,
+        badge: item.model.badge,
+        isCustom: item.model.isCustom,
+      }));
+
+      const providerCommandItems: ComposerCommandItem[] = rankedProviders.map((item) => ({
+        id: `provider:${item.entry.instanceId}`,
+        type: "provider" as const,
+        instanceId: item.entry.instanceId,
+        driverKind: item.entry.driverKind,
+        instanceDisplayName: item.entry.displayName,
+        accentColor: item.entry.accentColor,
+        iconUrl: item.entry.iconUrl,
+        agentId: item.entry.agentId,
+        label: item.entry.displayName,
+        description: `${item.entry.driverKind} provider`,
+      }));
+
       return [
         ...matchComposerThreadItems({
           shells: environmentThreadShells,
@@ -198,6 +277,8 @@ export function useComposerMenuItems({
               query: composerTrigger.query,
             })
           : []),
+        ...modelCommandItems,
+        ...providerCommandItems,
         ...workspaceEntries.entries.map((entry) => ({
           id: `path:${entry.kind}:${entry.path}`,
           type: "path" as const,

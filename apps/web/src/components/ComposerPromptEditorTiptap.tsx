@@ -109,6 +109,7 @@ import { WorkspaceEntryTooltip } from "./chat/WorkspaceEntryIcon";
 import { FileTagChipContent } from "./chat/FileTagChip";
 import { SkillChipPopover, skillPopoverDescription } from "./chat/SkillInlineText";
 import { AssistantCitationChip } from "./chat/AssistantCitationChip";
+import { ModelTagChip } from "./chat/ModelTagChip";
 import { getTimelinePageScrollKey } from "./chat/pageScrollController";
 import { ContextChip } from "./ContextChip";
 import {
@@ -522,6 +523,45 @@ function ComposerContextReferenceNodeView({ node }: NodeViewProps) {
   );
 }
 
+const ComposerModelTagExtension = Node.create({
+  name: "composer-model-tag",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      tagKind: { default: "model" },
+      instanceId: { default: "" },
+      model: { default: "" },
+      label: { default: "" },
+      source: { default: "" },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "span[data-composer-model-tag]" }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", { "data-composer-model-tag": "", ...HTMLAttributes }];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ComposerModelTagNodeView);
+  },
+});
+
+function ComposerModelTagNodeView({ node }: NodeViewProps) {
+  return (
+    <NodeViewWrapper as="span" className={CHIP_NODE_SELECTION_CLASS_NAME}>
+      <ModelTagChip
+        tagKind={(node.attrs.tagKind as "model" | "provider") ?? "model"}
+        instanceId={(node.attrs.instanceId as string) ?? ""}
+        model={(node.attrs.model as string) || undefined}
+        label={(node.attrs.label as string) ?? ""}
+      />
+    </NodeViewWrapper>
+  );
+}
+
 type StyledRange = {
   from: number;
   to: number;
@@ -839,6 +879,7 @@ function createComposerExtensions(richText: boolean) {
     ComposerSkillExtension,
     ComposerCitationExtension,
     ComposerContextReferenceExtension,
+    ComposerModelTagExtension,
     ComposerMarkersExtension,
     ...(richText
       ? [

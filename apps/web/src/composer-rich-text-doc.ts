@@ -480,6 +480,18 @@ function atomJsonForSegment(
       attrs: { citation: segment.citation, source: segment.source, citeKey: randomNodeKey() },
     };
   }
+  if (segment.type === "model-tag") {
+    return {
+      type: "composer-model-tag",
+      attrs: {
+        tagKind: segment.tagKind,
+        instanceId: segment.instanceId,
+        model: segment.model ?? "",
+        label: segment.label,
+        source: segment.source,
+      },
+    };
+  }
   return {
     type: "composer-context-reference",
     attrs: {
@@ -824,6 +836,7 @@ function readAtomSource(node: ProseMirrorNode): string {
     case "composer-mention":
     case "composer-citation":
     case "composer-context-reference":
+    case "composer-model-tag":
       return typeof attrs.source === "string" ? attrs.source : "";
     case "composer-skill": {
       const name = typeof attrs.skillName === "string" ? attrs.skillName : "";
