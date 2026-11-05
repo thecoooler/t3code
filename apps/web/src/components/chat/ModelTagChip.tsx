@@ -1,10 +1,11 @@
 import { useAtomValue } from "@effect/atom-react";
+import type { EnvironmentId } from "@t3tools/contracts";
 import { BotIcon, CpuIcon } from "lucide-react";
 import { memo } from "react";
 
 import { usePrimaryEnvironmentId } from "~/state/environments";
 import { serverEnvironment } from "~/state/server";
-import { deriveProviderInstanceEntries } from "~/providerInstances";
+import { deriveProviderInstanceEntries, type ProviderInstanceEntry } from "~/providerInstances";
 import { ContextChip, ContextChipLabel } from "../ContextChip";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
@@ -20,17 +21,28 @@ export interface ModelTagChipProps {
 
 export const ModelTagChip = memo(function ModelTagChip(props: ModelTagChipProps) {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
-  const providersAtom = primaryEnvironmentId
-    ? serverEnvironment.providersValueAtom(primaryEnvironmentId)
-    : null;
-  const providers = useAtomValue(providersAtom);
+  if (primaryEnvironmentId === null) {
+    return <ModelTagChipView {...props} instanceEntry={null} />;
+  }
+  return <ModelTagChipWithEnvironment {...props} environmentId={primaryEnvironmentId} />;
+});
 
+function ModelTagChipWithEnvironment(
+  props: ModelTagChipProps & { environmentId: EnvironmentId },
+) {
+  const providers = useAtomValue(serverEnvironment.providersValueAtom(props.environmentId));
   const instanceEntry = providers
     ? (deriveProviderInstanceEntries(providers).find(
         (candidate) => candidate.instanceId === props.instanceId,
       ) ?? null)
     : null;
+  return <ModelTagChipView {...props} instanceEntry={instanceEntry} />;
+}
 
+function ModelTagChipView(
+  props: ModelTagChipProps & { instanceEntry: ProviderInstanceEntry | null },
+) {
+  const { instanceEntry } = props;
   const chipContent = (
     <ContextChip
       kind={props.tagKind === "model" ? "model" : "provider"}
@@ -44,8 +56,8 @@ export const ModelTagChip = memo(function ModelTagChip(props: ModelTagChipProps)
           driverKind={instanceEntry.driverKind}
           displayName={instanceEntry.displayName}
           accentColor={instanceEntry.accentColor}
-          acpRegistryAgentId={instanceEntry.agentId}
-          acpRegistryIconUrl={instanceEntry.iconUrl}
+          acpRegistryAgentId={instanceEntry.acpRegistryAgentId}
+          acpRegistryIconUrl={instanceEntry.acpRegistryIconUrl}
           className="size-[1.17em] shrink-0"
         />
       ) : props.tagKind === "model" ? (
@@ -96,4 +108,4 @@ export const ModelTagChip = memo(function ModelTagChip(props: ModelTagChipProps)
       </TooltipPopup>
     </Tooltip>
   );
-});
+}

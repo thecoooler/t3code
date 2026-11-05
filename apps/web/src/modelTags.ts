@@ -78,7 +78,7 @@ export function collectModelAndProviderTags(text: string): ModelOrProviderTagOcc
     occurrences.push({
       tagKind: parsed.kind,
       instanceId: parsed.instanceId,
-      model: parsed.kind === "model" ? parsed.model : undefined,
+      ...(parsed.kind === "model" ? { model: parsed.model } : {}),
       label,
       source: match[0],
       start,

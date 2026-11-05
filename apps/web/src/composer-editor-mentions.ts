@@ -138,7 +138,7 @@ function splitPromptTextIntoComposerSegments(text: string): ComposerPromptSegmen
         type: "model-tag",
         tagKind: match.tagKind,
         instanceId: match.instanceId,
-        model: match.model,
+        ...(match.model !== undefined ? { model: match.model } : {}),
         label: match.label,
         source: match.source,
       });

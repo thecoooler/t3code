@@ -221,8 +221,10 @@ export function useComposerMenuItems({
               driverKind: item.entry.driverKind,
               providerDisplayName: item.entry.displayName,
               name: item.model.name,
-              shortName: item.model.shortName,
-              subProvider: item.model.subProvider,
+              ...(item.model.shortName !== undefined ? { shortName: item.model.shortName } : {}),
+              ...(item.model.subProvider !== undefined
+                ? { subProvider: item.model.subProvider }
+                : {}),
             })).slice(0, 10)
           : candidateModels.filter((item) => item.model.isDefault).slice(0, 5);
 
@@ -245,8 +247,8 @@ export function useComposerMenuItems({
         model: item.model.slug,
         modelName: item.model.name,
         accentColor: item.entry.accentColor,
-        iconUrl: item.entry.iconUrl,
-        agentId: item.entry.agentId,
+        iconUrl: item.entry.acpRegistryIconUrl,
+        agentId: item.entry.acpRegistryAgentId,
         label: item.model.name,
         description: `${item.entry.displayName}${item.model.subProvider ? ` • ${item.model.subProvider}` : ""}`,
         badge: item.model.badge,
@@ -260,8 +262,8 @@ export function useComposerMenuItems({
         driverKind: item.entry.driverKind,
         instanceDisplayName: item.entry.displayName,
         accentColor: item.entry.accentColor,
-        iconUrl: item.entry.iconUrl,
-        agentId: item.entry.agentId,
+        iconUrl: item.entry.acpRegistryIconUrl,
+        agentId: item.entry.acpRegistryAgentId,
         label: item.entry.displayName,
         description: `${item.entry.driverKind} provider`,
       }));
